@@ -75,7 +75,8 @@ function Invoke-AzCliJson {
 
     try {
         $json = $raw | ConvertFrom-Json
-    } catch {
+    }
+    catch {
         return [pscustomobject]@{
             ExitCode = $exitCode
             Raw      = $raw
@@ -112,7 +113,8 @@ Write-Host "🔍 Checking prerequisites..." -ForegroundColor Yellow
 try {
     $azVersion = az version --output json | ConvertFrom-Json
     Write-Host "  ✅ Azure CLI version: $($azVersion.'azure-cli')" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Error "Azure CLI is not installed. Please install it from https://aka.ms/installazurecli"
     exit 1
 }
@@ -121,7 +123,8 @@ try {
 try {
     $bicepVersion = az bicep version 2>&1
     Write-Host "  ✅ Bicep: $bicepVersion" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host "  ⚠️  Bicep not found, installing..." -ForegroundColor Yellow
     az bicep install
 }
@@ -148,7 +151,8 @@ if (-not $Yes) {
         Write-Host "Deployment cancelled." -ForegroundColor Red
         exit 0
     }
-} else {
+}
+else {
     Write-Host "  ✅ Confirmation skipped (-Yes)" -ForegroundColor Gray
 }
 
@@ -246,7 +250,8 @@ try {
     $deployment.properties.outputs | ConvertTo-Json -Depth 10 | Set-Content $outputsFile
     Write-Host "`n  📄 Outputs saved to: $outputsFile" -ForegroundColor Gray
 
-} catch {
+}
+catch {
     Write-Host "`n❌ Deployment failed!" -ForegroundColor Red
     Write-Host "   Error: $_" -ForegroundColor Red
     exit 1
@@ -269,7 +274,8 @@ if (-not $SkipRbac) {
     $rbacScript = Join-Path $PSScriptRoot "configure-rbac.ps1"
     if (Test-Path $rbacScript) {
         & $rbacScript -ResourceGroupName $resourceGroupName
-    } else {
+    }
+    else {
         Write-Host "  ⚠️  RBAC script not found, skipping..." -ForegroundColor Yellow
     }
 }
@@ -285,7 +291,8 @@ if (Test-Path $k8sPath) {
     # Wait for pods to start
     Write-Host "`n⏳ Waiting for pods to be ready (this may take 2-3 minutes)..." -ForegroundColor Yellow
     kubectl wait --for=condition=ready pod -l app.kubernetes.io/part-of=pets-store -n pets --timeout=180s 2>$null
-} else {
+}
+else {
     Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
 }
 
@@ -295,7 +302,8 @@ $validateScript = Join-Path $PSScriptRoot "validate-deployment.ps1"
 
 if (Test-Path $validateScript) {
     & $validateScript -ResourceGroupName $resourceGroupName
-} else {
+}
+else {
     Write-Host "  ⚠️  Validation script not found, skipping..." -ForegroundColor Yellow
 }
 

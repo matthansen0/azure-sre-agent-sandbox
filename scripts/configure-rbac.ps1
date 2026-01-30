@@ -56,7 +56,8 @@ if (-not $CurrentUserPrincipalId) {
     if ($account) {
         $CurrentUserPrincipalId = $account.id
         Write-Host "  ✅ Current user: $($account.displayName) ($CurrentUserPrincipalId)" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "  ⚠️  Could not determine current user. Some role assignments may be skipped." -ForegroundColor Yellow
     }
 }
@@ -114,7 +115,8 @@ function Set-RoleAssignment {
             --output none 2>$null
         
         Write-Host "       ✅ Assigned successfully" -ForegroundColor Green
-    } catch {
+    }
+    catch {
         Write-Host "       ⚠️  Failed to assign: $_" -ForegroundColor Yellow
         Write-Host "          This may be due to subscription policies." -ForegroundColor Gray
     }
@@ -255,7 +257,8 @@ $grafana = $null
 if ($grafanaJson -and $grafanaJson -match '^\s*\[') {
     try {
         $grafana = $grafanaJson | ConvertFrom-Json | Select-Object -First 1
-    } catch {
+    }
+    catch {
         # Ignore JSON parsing errors - Grafana likely not deployed
     }
 }

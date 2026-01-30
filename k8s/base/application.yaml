@@ -3,10 +3,10 @@
 # =============================================================================
 # This is the healthy baseline deployment of the AKS Store Demo application.
 # Based on Azure-Samples/aks-store-demo
-# 
+#
 # Architecture:
 # - store-front: Vue.js customer-facing website
-# - store-admin: Vue.js admin panel  
+# - store-admin: Vue.js admin panel
 # - order-service: Node.js order processing
 # - product-service: Rust-based product catalog
 # - makeline-service: Go order fulfillment
@@ -117,7 +117,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: managed-csi  # Uses Azure Managed Disk CSI driver (default in AKS)
+  storageClassName: managed-csi # Uses Azure Managed Disk CSI driver (default in AKS)
   resources:
     requests:
       storage: 8Gi
@@ -577,7 +577,7 @@ metadata:
   labels:
     app: virtual-worker
 spec:
-  replicas: 0  # Disabled: AMQP protocol mismatch with RabbitMQ 3.11
+  replicas: 0 # Disabled: AMQP protocol mismatch with RabbitMQ 3.11
   selector:
     matchLabels:
       app: virtual-worker

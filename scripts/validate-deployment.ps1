@@ -40,7 +40,8 @@ function Write-Check {
     if ($Passed) {
         Write-Host "  ✅ $Name" -ForegroundColor Green
         if ($Message -and $Detailed) { Write-Host "     $Message" -ForegroundColor Gray }
-    } else {
+    }
+    else {
         Write-Host "  ❌ $Name" -ForegroundColor Red
         if ($Message) { Write-Host "     $Message" -ForegroundColor Yellow }
     }
@@ -167,8 +168,8 @@ if (Write-Check "kubectl can connect to cluster" ($LASTEXITCODE -eq 0)) {
 $nodes = kubectl get nodes -o json 2>$null | ConvertFrom-Json
 $totalChecks++
 $healthyNodes = ($nodes.items | Where-Object { 
-    ($_.status.conditions | Where-Object { $_.type -eq "Ready" }).status -eq "True" 
-}).Count
+        ($_.status.conditions | Where-Object { $_.type -eq "Ready" }).status -eq "True" 
+    }).Count
 $totalNodes = $nodes.items.Count
 if (Write-Check "All nodes are Ready" ($healthyNodes -eq $totalNodes) "$healthyNodes/$totalNodes nodes ready") {
     $passedChecks++
@@ -184,7 +185,8 @@ $namespace = kubectl get namespace pets -o json 2>$null | ConvertFrom-Json
 $totalChecks++
 if (Write-Check "Namespace 'pets' exists" ($null -ne $namespace)) {
     $passedChecks++
-} else {
+}
+else {
     Write-Host "  ⚠️  Run: kubectl apply -f k8s/base/application.yaml" -ForegroundColor Yellow
 }
 
@@ -217,7 +219,8 @@ if ($namespace) {
         # Summary
         $runningPods = ($pods.items | Where-Object { $_.status.phase -eq "Running" }).Count
         Write-Host "`n  Summary: $runningPods/$($pods.items.Count) pods running" -ForegroundColor $(if ($runningPods -eq $pods.items.Count) { "Green" } else { "Yellow" })
-    } else {
+    }
+    else {
         Write-Host "  ⚠️  No pods found in 'pets' namespace" -ForegroundColor Yellow
         Write-Host "     Run: kubectl apply -f k8s/base/application.yaml" -ForegroundColor Gray
     }
@@ -239,10 +242,12 @@ foreach ($svc in $services.items) {
         }
         $hasEndpoint = $null -ne $externalIP
         $endpoint = if ($hasEndpoint) { $externalIP } else { "Pending" }
-    } elseif ($svcType -eq "ClusterIP") {
+    }
+    elseif ($svcType -eq "ClusterIP") {
         $hasEndpoint = $true
         $endpoint = $svc.spec.clusterIP
-    } else {
+    }
+    else {
         $hasEndpoint = $true
         $endpoint = $svcType
     }
@@ -279,7 +284,8 @@ if ($ciDaemonset.items.Count -gt 0) {
     if (Write-Check "Container Insights agent running" ($ready -eq $desired) "$ready/$desired pods") {
         $passedChecks++
     }
-} else {
+}
+else {
     # Azure Monitor Agent (newer)
     $amaDeployment = kubectl get pods -n kube-system -l app=ama-logs -o json 2>$null | ConvertFrom-Json
     if ($amaDeployment.items.Count -gt 0) {
@@ -288,7 +294,8 @@ if ($ciDaemonset.items.Count -gt 0) {
         if (Write-Check "Azure Monitor Agent running" ($running -gt 0) "$running pods") {
             $passedChecks++
         }
-    } else {
+    }
+    else {
         Write-Host "  ℹ️  No Container Insights agent detected" -ForegroundColor Gray
     }
 }
@@ -312,7 +319,8 @@ Next steps:
 3. Ask SRE Agent to diagnose!
 
 "@ -ForegroundColor Green
-} else {
+}
+else {
     $failedChecks = $totalChecks - $passedChecks
     Write-Host @"
 

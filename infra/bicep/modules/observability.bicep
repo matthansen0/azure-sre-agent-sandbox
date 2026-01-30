@@ -119,7 +119,10 @@ var _aksRef = aksClusterId // Reference to prevent unused parameter warning
 resource grafanaMonitoringReaderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(grafana.id, subscription().subscriptionId, 'MonitoringReader')
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '43d0d8ad-25c7-4714-9337-8ba259a9fe05') // Monitoring Reader
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
+    ) // Monitoring Reader
     principalId: grafana.identity.principalId
     principalType: 'ServicePrincipal'
   }
