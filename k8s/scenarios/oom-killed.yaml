@@ -1,0 +1,77 @@
+# =============================================================================
+# Breakable Scenarios for Azure SRE Agent Demo
+# =============================================================================
+# This file contains various failure scenarios that can be applied to the
+# AKS Store Demo application for demonstrating Azure SRE Agent diagnosis
+# capabilities.
+#
+# Each scenario is in its own YAML document separated by ---
+# Apply specific scenarios with: kubectl apply -f scenarios/<scenario>.yaml
+#
+# See docs/BREAKABLE-SCENARIOS.md for detailed instructions on using each.
+# =============================================================================
+
+# =============================================================================
+# SCENARIO 1: OOMKilled - Out of Memory Crash
+# =============================================================================
+# This scenario causes the order-service to run out of memory and crash.
+# SRE Agent can diagnose: "Pod is OOMKilled", recommend increasing memory limits.
+# 
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/oom-killed.yaml
+#
+# HOW TO FIX:
+# kubectl apply -f k8s/base/application.yaml
+# =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-oom
+  namespace: pets
+  labels:
+    app: order-service
+    scenario: oom-killed
+    sre-demo: breakable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+        scenario: oom-killed
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: order-service
+          image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+          ports:
+            - containerPort: 3000
+          # BREAKING CHANGE: Memory limit is way too low
+          resources:
+            requests:
+              memory: "8Mi"    # Extremely low
+              cpu: "100m"
+            limits:
+              memory: "16Mi"   # This will cause OOMKilled
+              cpu: "200m"
+          env:
+            - name: ORDER_QUEUE_HOSTNAME
+              value: "rabbitmq"
+            - name: ORDER_QUEUE_PORT
+              value: "5672"
+            - name: ORDER_QUEUE_USERNAME
+              value: "guest"
+            - name: ORDER_QUEUE_PASSWORD
+              value: "guest"
+            - name: ORDER_QUEUE_NAME
+              value: "orders"
+            - name: FASTIFY_ADDRESS
+              value: "0.0.0.0"
+            # Force memory allocation to trigger OOM faster
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=64"

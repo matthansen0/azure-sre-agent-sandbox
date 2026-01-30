@@ -1,0 +1,57 @@
+# =============================================================================
+# SCENARIO 2: CrashLoopBackOff - Application startup failure
+# =============================================================================
+# This scenario causes the product-service to fail on startup, entering
+# a CrashLoopBackOff state.
+# 
+# SRE Agent can diagnose: Pod is in CrashLoopBackOff, container exit code,
+# recommend checking application logs and configuration.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/crash-loop.yaml
+#
+# HOW TO FIX:
+# kubectl apply -f k8s/base/application.yaml
+# =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service-crash
+  namespace: pets
+  labels:
+    app: product-service
+    scenario: crash-loop
+    sre-demo: breakable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+        scenario: crash-loop
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: product-service
+          image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
+          ports:
+            - containerPort: 3002
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          env:
+            # BREAKING CHANGE: Invalid AI service URL causes startup failure
+            - name: AI_SERVICE_URL
+              value: "http://nonexistent-service:9999/"
+          # BREAKING CHANGE: Command that causes immediate exit
+          command: ["/bin/sh"]
+          args: ["-c", "echo 'Starting with invalid config...'; exit 1"]

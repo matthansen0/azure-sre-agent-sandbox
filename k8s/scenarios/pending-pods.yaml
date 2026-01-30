@@ -1,0 +1,49 @@
+# =============================================================================
+# SCENARIO 5: Pending Pods - Insufficient Resources
+# =============================================================================
+# This scenario creates pods with resource requests that cannot be satisfied,
+# leaving them in a Pending state.
+#
+# SRE Agent can diagnose: Pods pending due to insufficient resources,
+# recommend scaling the cluster or reducing resource requests.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/pending-pods.yaml
+#
+# HOW TO FIX:
+# kubectl delete deployment resource-hog -n pets
+# =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resource-hog
+  namespace: pets
+  labels:
+    app: resource-hog
+    scenario: pending-pods
+    sre-demo: breakable
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: resource-hog
+  template:
+    metadata:
+      labels:
+        app: resource-hog
+        scenario: pending-pods
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: resource-hog
+          image: mcr.microsoft.com/mirror/docker/library/nginx:alpine
+          resources:
+            # BREAKING CHANGE: Requesting more resources than available
+            requests:
+              memory: "32Gi"    # Excessive memory request
+              cpu: "8"         # Excessive CPU request
+            limits:
+              memory: "64Gi"
+              cpu: "16"

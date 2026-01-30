@@ -1,0 +1,62 @@
+# =============================================================================
+# SCENARIO 4: High CPU Utilization - Resource Exhaustion
+# =============================================================================
+# This scenario deploys a stress test pod that consumes excessive CPU,
+# affecting other workloads and triggering alerts.
+#
+# SRE Agent can diagnose: High CPU usage, resource contention, recommend
+# scaling, resource limits, or investigating the workload.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/high-cpu.yaml
+#
+# HOW TO FIX:
+# kubectl delete deployment cpu-stress-test -n pets
+# =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-stress-test
+  namespace: pets
+  labels:
+    app: cpu-stress-test
+    scenario: high-cpu
+    sre-demo: breakable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cpu-stress-test
+  template:
+    metadata:
+      labels:
+        app: cpu-stress-test
+        scenario: high-cpu
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: stress
+          image: mcr.microsoft.com/mirror/docker/library/alpine:latest
+          # BREAKING: Infinite CPU-intensive loop
+          command: ["/bin/sh"]
+          args:
+            - "-c"
+            - |
+              echo "Starting CPU stress test..."
+              while true; do
+                # CPU-intensive calculation
+                for i in $(seq 1 10000); do
+                  echo "scale=1000; 4*a(1)" | bc -l > /dev/null 2>&1 || true
+                done
+              done
+          resources:
+            # No limits means it will try to consume as much as available
+            requests:
+              memory: "32Mi"
+              cpu: "100m"
+            # Intentionally high to allow resource consumption
+            limits:
+              memory: "64Mi"
+              cpu: "2000m"

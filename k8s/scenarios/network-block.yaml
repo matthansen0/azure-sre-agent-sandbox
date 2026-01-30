@@ -1,0 +1,34 @@
+# =============================================================================
+# SCENARIO 7: Network Policy Blocking - Service Connectivity Issues
+# =============================================================================
+# This scenario applies a network policy that blocks all traffic to the
+# order-service, causing connectivity failures.
+#
+# SRE Agent can diagnose: Network connectivity issues, service unavailable,
+# recommend checking network policies and firewall rules.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/network-block.yaml
+#
+# HOW TO FIX:
+# kubectl delete networkpolicy deny-order-service -n pets
+# =============================================================================
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-order-service
+  namespace: pets
+  labels:
+    scenario: network-block
+    sre-demo: breakable
+spec:
+  podSelector:
+    matchLabels:
+      app: order-service
+  policyTypes:
+    - Ingress
+    - Egress
+  # BREAKING CHANGE: No ingress or egress rules = all traffic denied
+  ingress: []
+  egress: []

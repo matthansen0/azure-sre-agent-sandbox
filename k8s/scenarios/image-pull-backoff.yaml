@@ -1,0 +1,54 @@
+# =============================================================================
+# SCENARIO 3: ImagePullBackOff - Invalid container image
+# =============================================================================
+# This scenario references a non-existent container image, causing pods
+# to fail with ImagePullBackOff.
+#
+# SRE Agent can diagnose: Image pull failure, suggest checking image name,
+# registry credentials, or network connectivity.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/image-pull-backoff.yaml
+#
+# HOW TO FIX:
+# kubectl delete deployment makeline-service-bad-image -n pets
+# kubectl apply -f k8s/base/application.yaml
+# =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: makeline-service-bad-image
+  namespace: pets
+  labels:
+    app: makeline-service
+    scenario: image-pull-backoff
+    sre-demo: breakable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: makeline-service
+      scenario: bad-image
+  template:
+    metadata:
+      labels:
+        app: makeline-service
+        scenario: bad-image
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: makeline-service
+          # BREAKING CHANGE: This image doesn't exist
+          image: ghcr.io/azure-samples/aks-store-demo/makeline-service:nonexistent-tag-v999
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"

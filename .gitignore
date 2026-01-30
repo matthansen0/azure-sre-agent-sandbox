@@ -1,0 +1,186 @@
+# =============================================================================
+# Azure SRE Agent Demo Lab - Git Ignore
+# =============================================================================
+
+# =============================================================================
+# Azure
+# =============================================================================
+# Azure credentials (NEVER commit these)
+.azure/
+azure.json
+azureconfig.json
+**/servicePrincipal.json
+
+# Azure CLI output files
+*.azcli
+
+# Deployment outputs (may contain sensitive info)
+**/deployment-outputs.json
+
+# =============================================================================
+# Bicep / ARM
+# =============================================================================
+# Compiled ARM templates (can regenerate from Bicep)
+*.json
+!package.json
+!devcontainer.json
+!launch.json
+!tasks.json
+!settings.json
+!extensions.json
+!**/bicepconfig.json
+
+# Bicep lock files
+.bicep/
+
+# ARM deployment what-if outputs
+*-whatif.json
+
+# =============================================================================
+# Kubernetes
+# =============================================================================
+# Kubeconfig (contains credentials)
+kubeconfig
+kubeconfig.yaml
+*.kubeconfig
+
+# Helm
+**/charts/*.tgz
+**/.helmignore
+
+# Kubernetes secrets (NEVER commit)
+**/secrets.yaml
+**/secret.yaml
+**/*-secret.yaml
+**/*-secrets.yaml
+
+# =============================================================================
+# Secrets & Credentials
+# =============================================================================
+# Environment files with secrets
+.env
+.env.*
+*.env
+!.env.example
+!.env.template
+
+# Private keys
+*.pem
+*.key
+*.pfx
+*.p12
+id_rsa
+id_ed25519
+
+# Certificate files
+*.crt
+*.cer
+
+# Password files
+*password*
+*credential*
+*secret*
+!**/scenarios/*.yaml
+
+# =============================================================================
+# IDE & Editor
+# =============================================================================
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.history/
+*.vsix
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# OS Generated
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+
+# =============================================================================
+# Build & Output
+# =============================================================================
+# General build outputs
+bin/
+obj/
+out/
+dist/
+build/
+target/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =============================================================================
+# Package Managers
+# =============================================================================
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+ENV/
+.venv/
+
+# Go
+vendor/
+
+# =============================================================================
+# Testing
+# =============================================================================
+coverage/
+*.cover
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+
+# =============================================================================
+# Temporary Files
+# =============================================================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.cache
+.cache/

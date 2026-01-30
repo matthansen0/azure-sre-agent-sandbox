@@ -1,0 +1,605 @@
+# =============================================================================
+# AKS Store Demo - Base Application Deployment
+# =============================================================================
+# This is the healthy baseline deployment of the AKS Store Demo application.
+# Based on Azure-Samples/aks-store-demo
+# 
+# Architecture:
+# - store-front: Vue.js customer-facing website
+# - store-admin: Vue.js admin panel  
+# - order-service: Node.js order processing
+# - product-service: Rust-based product catalog
+# - makeline-service: Go order fulfillment
+# - ai-service: Python AI recommendations (optional)
+# - virtual-customer: Load generator
+# - virtual-worker: Order processor simulator
+#
+# Data Services (in-cluster):
+# - rabbitmq: Message queue
+# - mongodb: Database
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pets
+  labels:
+    app.kubernetes.io/part-of: aks-store-demo
+    sre-agent-demo: "true"
+
+---
+# =============================================================================
+# RabbitMQ - Message Queue
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: pets
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.11-management-alpine
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "check_port_connectivity"]
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "check_port_connectivity"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "guest"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "guest"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: pets
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+
+---
+# =============================================================================
+# MongoDB - Database Storage (Azure Managed Disk via CSI driver)
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-data-pvc
+  namespace: pets
+  labels:
+    app: mongodb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi  # Uses Azure Managed Disk CSI driver (default in AKS)
+  resources:
+    requests:
+      storage: 8Gi
+
+---
+# =============================================================================
+# MongoDB - Database
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: pets
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: mongodb
+          image: mongo:4.4
+          ports:
+            - containerPort: 27017
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-data-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: pets
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+
+---
+# =============================================================================
+# Product Service - Rust-based product catalog API
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: pets
+  labels:
+    app: product-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: product-service
+          image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
+          ports:
+            - containerPort: 3002
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          env:
+            - name: AI_SERVICE_URL
+              value: "http://ai-service:5001/"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: pets
+spec:
+  selector:
+    app: product-service
+  ports:
+    - port: 3002
+      targetPort: 3002
+
+---
+# =============================================================================
+# Order Service - Node.js order processing API
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: pets
+  labels:
+    app: order-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: order-service
+          image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          env:
+            - name: ORDER_QUEUE_HOSTNAME
+              value: "rabbitmq"
+            - name: ORDER_QUEUE_PORT
+              value: "5672"
+            - name: ORDER_QUEUE_USERNAME
+              value: "guest"
+            - name: ORDER_QUEUE_PASSWORD
+              value: "guest"
+            - name: ORDER_QUEUE_NAME
+              value: "orders"
+            - name: FASTIFY_ADDRESS
+              value: "0.0.0.0"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: pets
+spec:
+  selector:
+    app: order-service
+  ports:
+    - port: 3000
+      targetPort: 3000
+
+---
+# =============================================================================
+# Makeline Service - Go order fulfillment processor
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: makeline-service
+  namespace: pets
+  labels:
+    app: makeline-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: makeline-service
+  template:
+    metadata:
+      labels:
+        app: makeline-service
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: makeline-service
+          image: ghcr.io/azure-samples/aks-store-demo/makeline-service:latest
+          ports:
+            - containerPort: 3001
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          env:
+            - name: ORDER_QUEUE_URI
+              value: "amqp://guest:guest@rabbitmq:5672/"
+            - name: ORDER_QUEUE_USERNAME
+              value: "guest"
+            - name: ORDER_QUEUE_PASSWORD
+              value: "guest"
+            - name: ORDER_QUEUE_NAME
+              value: "orders"
+            - name: ORDER_DB_URI
+              value: "mongodb://mongodb:27017"
+            - name: ORDER_DB_NAME
+              value: "orderdb"
+            - name: ORDER_DB_COLLECTION_NAME
+              value: "orders"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: makeline-service
+  namespace: pets
+spec:
+  selector:
+    app: makeline-service
+  ports:
+    - port: 3001
+      targetPort: 3001
+
+---
+# =============================================================================
+# Store Front - Vue.js customer website
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-front
+  namespace: pets
+  labels:
+    app: store-front
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: store-front
+  template:
+    metadata:
+      labels:
+        app: store-front
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: store-front
+          image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          env:
+            - name: VUE_APP_ORDER_SERVICE_URL
+              value: "http://order-service:3000/"
+            - name: VUE_APP_PRODUCT_SERVICE_URL
+              value: "http://product-service:3002/"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-front
+  namespace: pets
+spec:
+  type: LoadBalancer
+  selector:
+    app: store-front
+  ports:
+    - port: 80
+      targetPort: 8080
+
+---
+# =============================================================================
+# Store Admin - Vue.js admin panel
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-admin
+  namespace: pets
+  labels:
+    app: store-admin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: store-admin
+  template:
+    metadata:
+      labels:
+        app: store-admin
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: store-admin
+          image: ghcr.io/azure-samples/aks-store-demo/store-admin:latest
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          env:
+            - name: VUE_APP_PRODUCT_SERVICE_URL
+              value: "http://product-service:3002/"
+            - name: VUE_APP_MAKELINE_SERVICE_URL
+              value: "http://makeline-service:3001/"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-admin
+  namespace: pets
+spec:
+  type: LoadBalancer
+  selector:
+    app: store-admin
+  ports:
+    - port: 80
+      targetPort: 8081
+
+---
+# =============================================================================
+# Virtual Customer - Load generator for testing
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: virtual-customer
+  namespace: pets
+  labels:
+    app: virtual-customer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: virtual-customer
+  template:
+    metadata:
+      labels:
+        app: virtual-customer
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: virtual-customer
+          image: ghcr.io/azure-samples/aks-store-demo/virtual-customer:latest
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "25m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+          env:
+            - name: ORDER_SERVICE_URL
+              value: "http://order-service:3000/"
+            - name: ORDERS_PER_HOUR
+              value: "100"
+
+---
+# =============================================================================
+# Virtual Worker - Order processor simulator (disabled by default due to AMQP compatibility)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: virtual-worker
+  namespace: pets
+  labels:
+    app: virtual-worker
+spec:
+  replicas: 0  # Disabled: AMQP protocol mismatch with RabbitMQ 3.11
+  selector:
+    matchLabels:
+      app: virtual-worker
+  template:
+    metadata:
+      labels:
+        app: virtual-worker
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: virtual-worker
+          image: ghcr.io/azure-samples/aks-store-demo/virtual-worker:latest
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "25m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+          env:
+            - name: MAKELINE_SERVICE_URL
+              value: "http://makeline-service:3001"
+            - name: ORDERS_PER_HOUR
+              value: "100"
