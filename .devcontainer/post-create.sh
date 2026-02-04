@@ -91,6 +91,9 @@ alias fix-all='kubectl apply -f k8s/base/application.yaml'
 alias fix-network='kubectl delete networkpolicy deny-order-service -n pets 2>/dev/null'
 alias fix-extras='kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>/dev/null'
 
+# Site URL command
+alias site='echo "Store Front: http://$(kubectl get svc store-front -n pets -o jsonpath=\"{.status.loadBalancer.ingress[0].ip}\" 2>/dev/null || echo "pending...")"'
+
 # Helpful functions
 function kwatch() {
     kubectl get pods -n ${1:-pets} -w
@@ -142,6 +145,13 @@ function fix-all { kubectl apply -f k8s/base/application.yaml }
 function fix-network { kubectl delete networkpolicy deny-order-service -n pets 2>$null }
 function fix-extras { kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>$null }
 
+# Site URL command  
+function site { 
+    $ip = kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+    if ($ip) { Write-Host "Store Front: http://$ip" -ForegroundColor Green } 
+    else { Write-Host "Store Front IP not ready yet..." -ForegroundColor Yellow }
+}
+
 # Menu/help function
 function menu {
     Write-Host @"
@@ -153,6 +163,7 @@ function menu {
 ║    az login --use-device-code  - Login to Azure                              ║
 ║    deploy                      - Deploy the infrastructure                   ║
 ║    destroy                     - Tear down the infrastructure                ║
+║    site                        - Show the store front URL                    ║
 ║    menu                        - Show this help menu                         ║
 ║                                                                              ║
 ║  Kubernetes Shortcuts (default namespace: pets):                             ║

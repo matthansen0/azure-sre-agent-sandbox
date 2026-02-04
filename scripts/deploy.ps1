@@ -299,7 +299,26 @@ if (Test-Path $k8sPath) {
     
     # Wait for pods to start
     Write-Host "`n⏳ Waiting for pods to be ready (this may take 2-3 minutes)..." -ForegroundColor Yellow
-    kubectl wait --for=condition=ready pod -l app.kubernetes.io/part-of=pets-store -n pets --timeout=180s 2>$null
+    kubectl wait --for=condition=ready pod -l app=store-front -n pets --timeout=180s 2>$null
+    
+    # Wait for LoadBalancer IP
+    Write-Host "⏳ Waiting for store-front external IP..." -ForegroundColor Yellow
+    $maxWait = 120
+    $waited = 0
+    $storeUrl = $null
+    while ($waited -lt $maxWait) {
+        $externalIp = kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+        if ($externalIp) {
+            $storeUrl = "http://$externalIp"
+            break
+        }
+        Start-Sleep -Seconds 5
+        $waited += 5
+    }
+    
+    if ($storeUrl) {
+        Write-Host "  ✅ Store Front URL: $storeUrl" -ForegroundColor Green
+    }
 }
 else {
     Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
@@ -318,6 +337,7 @@ else {
 
 # Final instructions
 $aksName = if ($outputs.aksClusterName.value) { $outputs.aksClusterName.value } else { "<check Azure Portal>" }
+$siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc store-front -n pets" }
 
 Write-Host @"
 
@@ -326,6 +346,7 @@ Write-Host @"
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Resources Deployed:                                                         ║
 ║    • AKS Cluster:    $($aksName.PadRight(44))║
+║    • Store Front:    $($siteUrlDisplay.PadRight(44))║
 ║                                                                              ║
 ║  ⚠️  SRE Agent Setup Required (Portal Only):                                 ║
 ║    Azure SRE Agent does not support programmatic creation yet.               ║
@@ -333,11 +354,11 @@ Write-Host @"
 ║    2. Click "Create" and select resource group: $resourceGroupName           ║
 ║                                                                              ║
 ║  Quick Start (after SRE Agent setup):                                        ║
-║    1. Break something:                                                       ║
-║       kubectl apply -f k8s/scenarios/oom-killed.yaml                        ║
-║    2. Ask SRE Agent: "Why are pods crashing in the pets namespace?"         ║
-║    3. Fix it:                                                                ║
-║       kubectl apply -f k8s/base/application.yaml                            ║
+║    1. Open the store: $siteUrlDisplay
+║    2. Break something: break-oom                                             ║
+║    3. Refresh store to see failure                                           ║
+║    4. Ask SRE Agent: "Why are pods crashing in the pets namespace?"         ║
+║    5. Fix it: fix-all                                                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
