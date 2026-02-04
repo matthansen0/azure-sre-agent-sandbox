@@ -57,9 +57,9 @@ cat >> ~/.bashrc << 'EOF'
 
 # Azure SRE Agent Demo Lab aliases
 alias k='kubectl'
-alias kgp='kubectl get pods'
-alias kgs='kubectl get svc'
-alias kgd='kubectl get deployments'
+alias kgp='kubectl get pods -n pets'
+alias kgs='kubectl get svc -n pets'
+alias kgd='kubectl get deployments -n pets'
 alias kgn='kubectl get namespaces'
 alias kd='kubectl describe'
 alias kl='kubectl logs'
@@ -75,9 +75,21 @@ alias azsub='az account list -o table'
 # Demo shortcuts
 alias deploy='pwsh ./scripts/deploy.ps1'
 alias destroy='pwsh ./scripts/destroy.ps1'
+
+# Break scenarios
 alias break-oom='kubectl apply -f k8s/scenarios/oom-killed.yaml'
 alias break-crash='kubectl apply -f k8s/scenarios/crash-loop.yaml'
+alias break-image='kubectl apply -f k8s/scenarios/image-pull-backoff.yaml'
+alias break-cpu='kubectl apply -f k8s/scenarios/high-cpu.yaml'
+alias break-pending='kubectl apply -f k8s/scenarios/pending-pods.yaml'
+alias break-probe='kubectl apply -f k8s/scenarios/probe-failure.yaml'
+alias break-network='kubectl apply -f k8s/scenarios/network-block.yaml'
+alias break-config='kubectl apply -f k8s/scenarios/missing-config.yaml'
+
+# Fix commands
 alias fix-all='kubectl apply -f k8s/base/application.yaml'
+alias fix-network='kubectl delete networkpolicy deny-order-service -n pets 2>/dev/null'
+alias fix-extras='kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>/dev/null'
 
 # Helpful functions
 function kwatch() {
@@ -98,9 +110,9 @@ cat > ~/.config/powershell/Microsoft.PowerShell_profile.ps1 << 'EOF'
 Set-Alias -Name k -Value kubectl
 
 # Functions
-function kgp { kubectl get pods @args }
-function kgs { kubectl get svc @args }
-function kgd { kubectl get deployments @args }
+function kgp { kubectl get pods -n pets @args }
+function kgs { kubectl get svc -n pets @args }
+function kgd { kubectl get deployments -n pets @args }
 function kgn { kubectl get namespaces @args }
 
 # Demo commands
@@ -120,7 +132,15 @@ function destroy {
 
 function break-oom { kubectl apply -f k8s/scenarios/oom-killed.yaml }
 function break-crash { kubectl apply -f k8s/scenarios/crash-loop.yaml }
+function break-image { kubectl apply -f k8s/scenarios/image-pull-backoff.yaml }
+function break-cpu { kubectl apply -f k8s/scenarios/high-cpu.yaml }
+function break-pending { kubectl apply -f k8s/scenarios/pending-pods.yaml }
+function break-probe { kubectl apply -f k8s/scenarios/probe-failure.yaml }
+function break-network { kubectl apply -f k8s/scenarios/network-block.yaml }
+function break-config { kubectl apply -f k8s/scenarios/missing-config.yaml }
 function fix-all { kubectl apply -f k8s/base/application.yaml }
+function fix-network { kubectl delete networkpolicy deny-order-service -n pets 2>$null }
+function fix-extras { kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>$null }
 
 # Menu/help function
 function menu {
@@ -135,13 +155,23 @@ function menu {
 ║    destroy                     - Tear down the infrastructure                ║
 ║    menu                        - Show this help menu                         ║
 ║                                                                              ║
-║  Kubernetes Shortcuts:                                                       ║
-║    k, kgp, kgs, kgd, kgn       - kubectl aliases                             ║
+║  Kubernetes Shortcuts (default namespace: pets):                             ║
+║    kgp, kgs, kgd               - Get pods/services/deployments               ║
 ║                                                                              ║
 ║  Break Scenarios:                                                            ║
-║    break-oom                   - Apply OOM scenario                          ║
-║    break-crash                 - Apply crash-loop scenario                   ║
-║    fix-all                     - Restore healthy state                       ║
+║    break-oom                   - OOMKilled (order-service)                   ║
+║    break-crash                 - CrashLoopBackOff (product-service)          ║
+║    break-image                 - ImagePullBackOff (makeline-service)         ║
+║    break-cpu                   - High CPU (new stress pod)                   ║
+║    break-pending               - Pending pods (insufficient resources)       ║
+║    break-probe                 - Liveness probe failure                      ║
+║    break-network               - Network policy blocking                     ║
+║    break-config                - Missing ConfigMap                           ║
+║                                                                              ║
+║  Fix Commands:                                                               ║
+║    fix-all                     - Restore all services to healthy state       ║
+║    fix-network                 - Remove network policy                       ║
+║    fix-extras                  - Delete extra broken deployments             ║
 ║                                                                              ║
 ║  Documentation: docs/                                                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
