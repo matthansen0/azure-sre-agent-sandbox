@@ -25,6 +25,8 @@ metadata:
     sre-demo: breakable
 spec:
   replicas: 2
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: product-service
