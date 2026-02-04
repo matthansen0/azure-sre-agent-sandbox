@@ -27,7 +27,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service-oom
+  name: order-service
   namespace: pets
   labels:
     app: order-service
@@ -42,7 +42,6 @@ spec:
     metadata:
       labels:
         app: order-service
-        scenario: oom-killed
     spec:
       nodeSelector:
         nodepool-type: user

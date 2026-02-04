@@ -11,14 +11,13 @@
 # kubectl apply -f k8s/scenarios/image-pull-backoff.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment makeline-service-bad-image -n pets
 # kubectl apply -f k8s/base/application.yaml
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: makeline-service-bad-image
+  name: makeline-service
   namespace: pets
   labels:
     app: makeline-service
@@ -29,12 +28,10 @@ spec:
   selector:
     matchLabels:
       app: makeline-service
-      scenario: bad-image
   template:
     metadata:
       labels:
         app: makeline-service
-        scenario: bad-image
     spec:
       nodeSelector:
         nodepool-type: user

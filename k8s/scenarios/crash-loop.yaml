@@ -17,7 +17,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service-crash
+  name: product-service
   namespace: pets
   labels:
     app: product-service
@@ -32,7 +32,6 @@ spec:
     metadata:
       labels:
         app: product-service
-        scenario: crash-loop
     spec:
       nodeSelector:
         nodepool-type: user
