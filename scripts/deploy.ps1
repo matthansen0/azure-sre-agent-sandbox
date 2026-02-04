@@ -62,6 +62,7 @@ function Invoke-AzCliJson {
         [string]$Command
     )
 
+    # Run command and capture all output
     $raw = Invoke-Expression $Command 2>&1 | Out-String
     $exitCode = $LASTEXITCODE
 
@@ -73,8 +74,16 @@ function Invoke-AzCliJson {
         }
     }
 
+    # Extract JSON from output (skip any warning lines before the JSON)
+    $jsonStart = $raw.IndexOf('{')
+    if ($jsonStart -ge 0) {
+        $jsonContent = $raw.Substring($jsonStart)
+    } else {
+        $jsonContent = $raw
+    }
+
     try {
-        $json = $raw | ConvertFrom-Json
+        $json = $jsonContent | ConvertFrom-Json
     }
     catch {
         return [pscustomobject]@{
