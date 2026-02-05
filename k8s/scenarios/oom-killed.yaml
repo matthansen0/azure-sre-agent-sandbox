@@ -16,7 +16,7 @@
 # =============================================================================
 # This scenario causes the order-service to run out of memory and crash.
 # SRE Agent can diagnose: "Pod is OOMKilled", recommend increasing memory limits.
-# 
+#
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/oom-killed.yaml
 #
@@ -55,10 +55,10 @@ spec:
           # BREAKING CHANGE: Memory limit is way too low
           resources:
             requests:
-              memory: "8Mi"    # Extremely low
+              memory: "8Mi" # Extremely low
               cpu: "100m"
             limits:
-              memory: "16Mi"   # This will cause OOMKilled
+              memory: "16Mi" # This will cause OOMKilled
               cpu: "200m"
           env:
             - name: ORDER_QUEUE_HOSTNAME

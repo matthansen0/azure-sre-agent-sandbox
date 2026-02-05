@@ -78,7 +78,8 @@ function Invoke-AzCliJson {
     $jsonStart = $raw.IndexOf('{')
     if ($jsonStart -ge 0) {
         $jsonContent = $raw.Substring($jsonStart)
-    } else {
+    }
+    else {
         $jsonContent = $raw
     }
 

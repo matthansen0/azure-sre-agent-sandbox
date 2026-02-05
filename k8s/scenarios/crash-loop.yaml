@@ -3,7 +3,7 @@
 # =============================================================================
 # This scenario causes the product-service to fail on startup, entering
 # a CrashLoopBackOff state.
-# 
+#
 # SRE Agent can diagnose: Pod is in CrashLoopBackOff, container exit code,
 # recommend checking application logs and configuration.
 #
