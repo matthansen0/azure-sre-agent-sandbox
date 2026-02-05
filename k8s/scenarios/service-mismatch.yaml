@@ -1,0 +1,40 @@
+# =============================================================================
+# SCENARIO 10: Service Selector Mismatch - Silent Networking Failure
+# =============================================================================
+# This scenario replaces the order-service Service with one that has a wrong
+# selector label. The order-service pods are perfectly healthy, but the Service
+# routes to nothing because the selector doesn't match any pods.
+#
+# This is a subtle, realistic networking issue:
+# - All pods show Running/Ready (no crashes, no restarts)
+# - store-front loads fine (it's a client-side app)
+# - But placing an order fails silently (order-service unreachable)
+# - SRE Agent must check Service endpoints, not just pod status
+#
+# SRE Agent can diagnose: Empty endpoints, selector mismatch between Service
+# and Deployment labels, recommend correcting the selector.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/service-mismatch.yaml
+#
+# HOW TO FIX:
+# kubectl apply -f k8s/base/application.yaml
+# =============================================================================
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: pets
+  labels:
+    scenario: service-mismatch
+    sre-demo: breakable
+spec:
+  selector:
+    # BREAKING CHANGE: Selector doesn't match any existing pods
+    # Real pods have label: app=order-service
+    # This selector looks for app=order-service-v2 (doesn't exist)
+    app: order-service-v2
+  ports:
+    - port: 3000
+      targetPort: 3000

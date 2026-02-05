@@ -68,6 +68,8 @@ Located in `k8s/scenarios/`:
 | `probe-failure.yaml` | Health check failure | Probe configuration |
 | `network-block.yaml` | Connectivity issues | Network policies |
 | `missing-config.yaml` | ConfigMap reference | Configuration issues |
+| `mongodb-down.yaml` | Cascading dependency failure | Dependency tracing, root cause |
+| `service-mismatch.yaml` | Silent networking failure | Endpoint/selector analysis |
 
 ## Common Operations
 
@@ -78,6 +80,8 @@ Type `menu` in the terminal to see all available commands. Key shortcuts:
 - `site` - Show store front URL
 - `kgp` - Get pods in pets namespace
 - `break-oom`, `break-crash`, `break-image` - Apply scenarios
+- `break-mongodb` - Cascading database failure
+- `break-service` - Silent networking failure
 - `fix-all` - Restore healthy state
 
 ### Deploy Infrastructure

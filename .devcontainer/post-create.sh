@@ -85,6 +85,8 @@ alias break-pending='kubectl apply -f k8s/scenarios/pending-pods.yaml'
 alias break-probe='kubectl apply -f k8s/scenarios/probe-failure.yaml'
 alias break-network='kubectl apply -f k8s/scenarios/network-block.yaml'
 alias break-config='kubectl apply -f k8s/scenarios/missing-config.yaml'
+alias break-mongodb='kubectl apply -f k8s/scenarios/mongodb-down.yaml'
+alias break-service='kubectl apply -f k8s/scenarios/service-mismatch.yaml'
 
 # Fix commands
 alias fix-all='kubectl apply -f k8s/base/application.yaml'
@@ -141,6 +143,8 @@ function break-pending { kubectl apply -f k8s/scenarios/pending-pods.yaml }
 function break-probe { kubectl apply -f k8s/scenarios/probe-failure.yaml }
 function break-network { kubectl apply -f k8s/scenarios/network-block.yaml }
 function break-config { kubectl apply -f k8s/scenarios/missing-config.yaml }
+function break-mongodb { kubectl apply -f k8s/scenarios/mongodb-down.yaml }
+function break-service { kubectl apply -f k8s/scenarios/service-mismatch.yaml }
 function fix-all { kubectl apply -f k8s/base/application.yaml }
 function fix-network { kubectl delete networkpolicy deny-order-service -n pets 2>$null }
 function fix-extras { kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>$null }
@@ -178,6 +182,8 @@ function menu {
 ║    break-probe                 - Liveness probe failure                      ║
 ║    break-network               - Network policy blocking                     ║
 ║    break-config                - Missing ConfigMap                           ║
+║    break-mongodb               - MongoDB down (cascading failure)            ║
+║    break-service               - Service selector mismatch                   ║
 ║                                                                              ║
 ║  Fix Commands:                                                               ║
 ║    fix-all                     - Restore all services to healthy state       ║

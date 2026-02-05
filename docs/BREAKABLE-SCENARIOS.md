@@ -14,6 +14,8 @@ This guide explains each failure scenario available in the demo lab and how to u
 | Probe Failure | `probe-failure.yaml` | Health check failure | Probe configuration analysis |
 | Network Block | `network-block.yaml` | Connectivity issues | Network policy analysis |
 | Missing Config | `missing-config.yaml` | ConfigMap reference | Configuration troubleshooting |
+| MongoDB Down | `mongodb-down.yaml` | Cascading dependency failure | Dependency tracing, root cause |
+| Service Mismatch | `service-mismatch.yaml` | Silent networking failure | Endpoint/selector analysis |
 
 ## Scenario Details
 
@@ -293,6 +295,93 @@ kubectl describe pod -l app=misconfigured-service -n pets | grep -A 10 Events
 **How to fix:**
 ```bash
 kubectl delete deployment misconfigured-service -n pets
+```
+
+---
+
+### 9. MongoDB Down - Cascading Dependency Failure
+
+**File:** `k8s/scenarios/mongodb-down.yaml`
+
+**What happens:**
+- Scales MongoDB deployment to 0 replicas (database goes offline)
+- makeline-service can't connect to MongoDB, starts failing health checks
+- Orders can still be placed (queued in RabbitMQ) but never get fulfilled
+- This is the most realistic scenario: requires tracing a dependency chain
+
+**How to break:**
+```bash
+kubectl apply -f k8s/scenarios/mongodb-down.yaml
+```
+
+**What to observe:**
+```bash
+# MongoDB has 0 replicas
+kubectl get deployment mongodb -n pets
+
+# makeline-service becomes unhealthy
+kubectl get pods -n pets -l app=makeline-service
+
+# Orders queue up in RabbitMQ but never complete
+kubectl exec -n pets deploy/rabbitmq -- rabbitmqctl list_queues
+```
+
+**SRE Agent prompts:**
+- "The app is up but orders aren't going through. What's wrong?"
+- "Why is makeline-service failing health checks?"
+- "Trace the dependency chain — what broke first?"
+- "Scale the mongodb deployment back to 1 replica"
+
+**How to fix:**
+```bash
+kubectl apply -f k8s/base/application.yaml
+```
+
+---
+
+### 10. Service Selector Mismatch - Silent Networking Failure
+
+**File:** `k8s/scenarios/service-mismatch.yaml`
+
+**What happens:**
+- Replaces the order-service Service with a wrong selector (`app: order-service-v2`)
+- The order-service pods are perfectly healthy (Running, Ready)
+- But the Service has zero endpoints — traffic doesn't reach any pod
+- The store-front loads fine, but placing an order fails silently
+
+**Why this is interesting:**
+- All pods show green — no crashes, no restarts, no OOM
+- `kubectl get pods` looks completely healthy
+- SRE Agent must check Service endpoints and selector labels, not just pod status
+- This mimics a common real-world misconfiguration (typo in selector)
+
+**How to break:**
+```bash
+kubectl apply -f k8s/scenarios/service-mismatch.yaml
+```
+
+**What to observe:**
+```bash
+# Pods are healthy!
+kubectl get pods -n pets -l app=order-service
+
+# But the Service has no endpoints
+kubectl get endpoints order-service -n pets
+
+# Compare selector vs. pod labels
+kubectl get svc order-service -n pets -o jsonpath='{.spec.selector}'
+kubectl get pods -n pets -l app=order-service --show-labels
+```
+
+**SRE Agent prompts:**
+- "The site loads but placing an order fails. Everything looks healthy though."
+- "Why does the order-service have no endpoints?"
+- "Compare the order-service Service selector to the actual pod labels"
+- "Fix the selector on the order-service Service to match the pods"
+
+**How to fix:**
+```bash
+kubectl apply -f k8s/base/application.yaml
 ```
 
 ---

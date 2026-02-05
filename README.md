@@ -81,7 +81,7 @@ After deployment:
    - "What's causing high CPU usage?"
    - "Diagnose the CrashLoopBackOff error"
 
-See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions.
+See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions, or [docs/PROMPTS-GUIDE.md](docs/PROMPTS-GUIDE.md) for a full catalog of prompts to try.
 
 ## 💰 Cost Estimate
 
@@ -104,6 +104,8 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 | ProbeFailure | Failing health checks | Probe configuration |
 | NetworkBlock | NetworkPolicy blocking traffic | Connectivity analysis |
 | MissingConfig | Non-existent ConfigMap | Configuration troubleshooting |
+| MongoDBDown | Database offline, cascading failure | Dependency tracing, root cause |
+| ServiceMismatch | Wrong Service selector, silent failure | Endpoint/selector analysis |
 
 ## 🛠️ Commands Reference
 
@@ -137,6 +139,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 ## 📚 Documentation
 
 - [SRE Agent Setup Guide](docs/SRE-AGENT-SETUP.md)
+- [Prompts Guide](docs/PROMPTS-GUIDE.md)
 - [Breakable Scenarios Guide](docs/BREAKABLE-SCENARIOS.md)
 - [Cost Estimation](docs/COSTS.md)
 
