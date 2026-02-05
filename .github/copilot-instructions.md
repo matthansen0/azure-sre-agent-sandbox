@@ -71,6 +71,15 @@ Located in `k8s/scenarios/`:
 
 ## Common Operations
 
+### Dev Container Commands
+Type `menu` in the terminal to see all available commands. Key shortcuts:
+- `deploy` - Deploy infrastructure
+- `destroy` - Tear down infrastructure  
+- `site` - Show store front URL
+- `kgp` - Get pods in pets namespace
+- `break-oom`, `break-crash`, `break-image` - Apply scenarios
+- `fix-all` - Restore healthy state
+
 ### Deploy Infrastructure
 ```powershell
 .\scripts\deploy.ps1 -Location eastus2 -Yes

@@ -83,7 +83,7 @@ After deployment:
 
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions.
 
-##  Cost Estimate
+## 💰 Cost Estimate
 
 | Configuration | Monthly Cost |
 |--------------|--------------|
@@ -142,7 +142,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
 ## 🤝 Contributing
 
-Contributions welcome! Please read our contributing guidelines and submit PRs.
+Contributions welcome! Feel free to open issues or submit PRs.
 
 ## 📄 License
 
