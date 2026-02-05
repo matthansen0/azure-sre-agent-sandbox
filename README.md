@@ -29,6 +29,8 @@ az login --use-device-code
 .\scripts\deploy.ps1 -Location eastus2 -Yes
 ```
 
+> 💡 **Tip**: Type `menu` in the terminal to see all available commands including break scenarios, fix commands, and kubectl shortcuts.
+
 ### Create SRE Agent (Portal Only)
 
 > ⚠️ **Note**: Azure SRE Agent does not support programmatic deployment yet. You must create it manually in the Azure Portal.
@@ -47,25 +49,25 @@ After deployment, verify everything is healthy:
 
 ## 💥 Breaking Things (The Fun Part!)
 
-Once deployed, you can break the application in various ways:
+Once deployed, you can break the application using shortcut commands:
 
 ```bash
 # Out of Memory scenario
-kubectl apply -f k8s/scenarios/oom-killed.yaml
+break-oom
 
 # CrashLoopBackOff
-kubectl apply -f k8s/scenarios/crash-loop.yaml
+break-crash
 
 # Image Pull failure
-kubectl apply -f k8s/scenarios/image-pull-backoff.yaml
+break-image
 
-# Network blocking
-kubectl apply -f k8s/scenarios/network-block.yaml
+# See all scenarios
+menu
 ```
 
 To restore:
 ```bash
-kubectl apply -f k8s/base/application.yaml
+fix-all
 ```
 
 ## 🤖 Using SRE Agent
