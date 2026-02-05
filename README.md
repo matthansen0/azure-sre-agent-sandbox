@@ -83,25 +83,7 @@ After deployment:
 
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions.
 
-## 📁 Repository Structure
-
-```
-├── infra/bicep/           # Bicep IaC templates
-│   ├── main.bicep         # Main deployment orchestration
-│   ├── main.bicepparam    # Parameters file
-│   └── modules/           # Modular Bicep templates
-├── k8s/
-│   ├── base/              # Healthy application manifests
-│   └── scenarios/         # Breakable failure scenarios
-├── scripts/               # Deployment and management scripts
-├── docs/                  # Documentation
-│   ├── SRE-AGENT-SETUP.md # SRE Agent configuration guide
-│   ├── BREAKABLE-SCENARIOS.md # Scenario details
-│   └── COSTS.md           # Cost estimates
-└── .devcontainer/         # Dev container configuration
-```
-
-## 💰 Cost Estimate
+##  Cost Estimate
 
 | Configuration | Monthly Cost |
 |--------------|--------------|
