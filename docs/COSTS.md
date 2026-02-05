@@ -1,24 +1,25 @@
 # Cost Estimation Guide
 
-This document provides estimated monthly costs for running the Azure SRE Agent Demo Lab.
+This document provides estimated costs for running the Azure SRE Agent Demo Lab.
 
 > **Note:** Costs are estimates based on US East 2 region pricing as of 2024. Actual costs may vary based on region, usage patterns, and Azure pricing changes.
 
 ## Quick Cost Summary
 
-| Component | Monthly Cost (Estimate) | Notes |
-|-----------|-------------------------|-------|
-| **AKS Control Plane** | $73 | Standard tier with SLA |
-| **AKS Nodes (System)** | ~$140 | 2x Standard_D2s_v5 |
-| **AKS Nodes (User)** | ~$210 | 3x Standard_D2s_v5 |
-| **Container Registry** | ~$5 | Basic tier |
-| **Log Analytics** | ~$30-50 | Based on data ingestion |
-| **Application Insights** | ~$10-20 | Based on data volume |
-| **Managed Grafana** | ~$75 | Standard tier |
-| **Azure Monitor (Prometheus)** | ~$15 | Based on metrics volume |
-| **Key Vault** | ~$3 | Minimal operations |
-| **SRE Agent** | ~$292-400 | Base + execution costs |
-| **Total** | **~$650-850/month** | |
+| Component | Daily Cost | Monthly Cost | Notes |
+|-----------|------------|--------------|-------|
+| **AKS Control Plane** | ~$2.40 | $73 | Standard tier with SLA |
+| **AKS Nodes (System)** | ~$4.70 | ~$140 | 2x Standard_D2s_v5 |
+| **AKS Nodes (User)** | ~$7.00 | ~$210 | 3x Standard_D2s_v5 |
+| **Container Registry** | ~$0.17 | ~$5 | Basic tier |
+| **Log Analytics** | ~$1-2 | ~$30-50 | Based on data ingestion |
+| **Application Insights** | ~$0.30-0.70 | ~$10-20 | Based on data volume |
+| **Managed Grafana** | ~$2.50 | ~$75 | Standard tier |
+| **Azure Monitor (Prometheus)** | ~$0.50 | ~$15 | Based on metrics volume |
+| **Key Vault** | ~$0.10 | ~$3 | Minimal operations |
+| **SRE Agent** | ~$10-13 | ~$292-400 | Base + execution costs |
+| **Total (without SRE Agent)** | **~$22-28** | **~$650-850** | |
+| **Total (with SRE Agent)** | **~$32-38** | **~$950-1,150** | |
 
 ## Detailed Cost Breakdown
 

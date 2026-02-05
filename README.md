@@ -85,10 +85,10 @@ See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions
 
 ## 💰 Cost Estimate
 
-| Configuration | Monthly Cost |
-|--------------|--------------|
-| Default deployment | ~$650-850 |
-| + SRE Agent | ~$950-1,150 |
+| Configuration | Daily Cost | Monthly Cost |
+|--------------|------------|--------------|
+| Default deployment | ~$22-28 | ~$650-850 |
+| + SRE Agent | ~$32-38 | ~$950-1,150 |
 
 See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
