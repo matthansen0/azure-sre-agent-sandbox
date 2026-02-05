@@ -109,7 +109,7 @@ kubectl apply -f k8s/scenarios/image-pull-backoff.yaml
 kubectl get pods -n pets | grep makeline
 
 # Check events
-kubectl describe pod -l scenario=bad-image -n pets | grep -A 10 Events
+kubectl describe pod -l app=makeline-service -n pets | grep -A 10 Events
 ```
 
 **SRE Agent prompts:**
@@ -119,7 +119,6 @@ kubectl describe pod -l scenario=bad-image -n pets | grep -A 10 Events
 
 **How to fix:**
 ```bash
-kubectl delete deployment makeline-service-bad-image -n pets
 kubectl apply -f k8s/base/application.yaml
 ```
 
