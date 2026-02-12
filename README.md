@@ -19,6 +19,8 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) installed
 - [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (optional but recommended)
 
+![Menu](media/menu.png)
+
 ### Deploy
 
 ```powershell
