@@ -45,8 +45,9 @@ resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
       logAnalyticsWorkspaceId
     ]
     evaluationFrequency: 'PT1M'
-    windowSize: 'PT2M'
+    windowSize: 'PT1M'
     autoMitigate: true
+    skipQueryValidation: true
     criteria: {
       allOf: [
         {
@@ -81,6 +82,7 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
     evaluationFrequency: 'PT5M'
     windowSize: 'PT10M'
     autoMitigate: true
+    skipQueryValidation: true
     criteria: {
       allOf: [
         {
@@ -113,8 +115,9 @@ resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
       logAnalyticsWorkspaceId
     ]
     evaluationFrequency: 'PT1M'
-    windowSize: 'PT2M'
+    windowSize: 'PT1M'
     autoMitigate: true
+    skipQueryValidation: true
     criteria: {
       allOf: [
         {
@@ -147,8 +150,9 @@ resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' =
       logAnalyticsWorkspaceId
     ]
     evaluationFrequency: 'PT1M'
-    windowSize: 'PT2M'
+    windowSize: 'PT1M'
     autoMitigate: true
+    skipQueryValidation: true
     criteria: {
       allOf: [
         {
