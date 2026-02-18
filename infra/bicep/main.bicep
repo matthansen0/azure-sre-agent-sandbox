@@ -28,6 +28,23 @@ param location string = 'eastus2'
 @description('Deploy full observability stack (Managed Grafana, Prometheus)')
 param deployObservability bool = true
 
+@description('Deploy baseline Azure Monitor alert rules for AKS and app telemetry')
+param deployAlerts bool = true
+
+@description('Deploy default Action Group for alert notifications and incident routing')
+param deployActionGroup bool = false
+
+@description('Action Group short name (max 12 characters)')
+@maxLength(12)
+param actionGroupShortName string = 'srelabops'
+
+@secure()
+@description('Optional webhook/Logic App callback URL for default Action Group incident routing')
+param incidentWebhookServiceUri string = ''
+
+@description('Optional action group resource IDs to notify when alerts fire')
+param alertActionGroupIds array = []
+
 @description('AKS Kubernetes version')
 param kubernetesVersion string = '1.32'
 
@@ -195,6 +212,35 @@ module observability 'modules/observability.bicep' = if (deployObservability) {
   }
 }
 
+module defaultActionGroup 'modules/action-group.bicep' = if (deployActionGroup) {
+  scope: resourceGroup
+  name: 'deploy-default-action-group'
+  params: {
+    name: 'ag-${workloadName}'
+    location: location
+    tags: tags
+    shortName: actionGroupShortName
+    webhookServiceUri: incidentWebhookServiceUri
+  }
+}
+
+var effectiveAlertActionGroupIds = deployActionGroup
+  ? concat(alertActionGroupIds, [defaultActionGroup!.outputs.actionGroupId])
+  : alertActionGroupIds
+
+module alerts 'modules/alerts.bicep' = if (deployAlerts) {
+  scope: resourceGroup
+  name: 'deploy-alerts'
+  params: {
+    namePrefix: 'alert-${workloadName}'
+    location: location
+    tags: tags
+    logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
+    appNamespace: 'pets'
+    actionGroupIds: effectiveAlertActionGroupIds
+  }
+}
+
 // =============================================================================
 // OUTPUTS
 // =============================================================================
@@ -204,6 +250,17 @@ output aksClusterName string = aks.outputs.aksName
 output aksClusterFqdn string = aks.outputs.aksFqdn
 output acrLoginServer string = containerRegistry.outputs.loginServer
 output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
+output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
 output keyVaultUri string = keyVault.outputs.vaultUri
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
+output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
+output prometheusDataCollectionEndpointId string = deployObservability ? observability!.outputs.dataCollectionEndpointId : ''
+output prometheusDataCollectionRuleId string = deployObservability ? observability!.outputs.dataCollectionRuleId : ''
+output prometheusDcrAssociationId string = deployObservability ? observability!.outputs.dataCollectionRuleAssociationId : ''
+output defaultActionGroupId string = deployActionGroup ? defaultActionGroup!.outputs.actionGroupId : ''
+output defaultActionGroupHasWebhook bool = deployActionGroup ? defaultActionGroup!.outputs.hasWebhookReceiver : false
+output podRestartAlertId string = deployAlerts ? alerts!.outputs.podRestartAlertId : ''
+output http5xxAlertId string = deployAlerts ? alerts!.outputs.http5xxAlertId : ''
+output podFailureAlertId string = deployAlerts ? alerts!.outputs.podFailureAlertId : ''
+output crashLoopOomAlertId string = deployAlerts ? alerts!.outputs.crashLoopOomAlertId : ''

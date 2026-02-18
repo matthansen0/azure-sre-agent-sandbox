@@ -228,6 +228,28 @@ if ($SreAgentPrincipalId) {
             -PrincipalType "ServicePrincipal" `
             -Description "Log Analytics Contributor for SRE Agent (query and manage logs)"
     }
+
+    # Application Insights read access for telemetry correlation
+    $appInsights = az resource list --resource-group $ResourceGroupName --resource-type "Microsoft.Insights/components" --output json 2>$null | ConvertFrom-Json | Select-Object -First 1
+    if ($appInsights) {
+        Set-RoleAssignment `
+            -Scope $appInsights.id `
+            -RoleDefinition "Monitoring Reader" `
+            -PrincipalId $SreAgentPrincipalId `
+            -PrincipalType "ServicePrincipal" `
+            -Description "Monitoring Reader for SRE Agent on Application Insights"
+    }
+
+    # Azure Monitor Workspace access for managed Prometheus metrics
+    $azureMonitorWorkspace = az resource list --resource-group $ResourceGroupName --resource-type "Microsoft.Monitor/accounts" --output json 2>$null | ConvertFrom-Json | Select-Object -First 1
+    if ($azureMonitorWorkspace) {
+        Set-RoleAssignment `
+            -Scope $azureMonitorWorkspace.id `
+            -RoleDefinition "Monitoring Reader" `
+            -PrincipalId $SreAgentPrincipalId `
+            -PrincipalType "ServicePrincipal" `
+            -Description "Monitoring Reader for SRE Agent on Azure Monitor Workspace"
+    }
     
     # Key Vault access for secrets management
     if ($keyVault) {

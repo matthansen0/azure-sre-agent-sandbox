@@ -20,6 +20,12 @@ param tags object
 @description('AKS cluster ID to monitor')
 param aksClusterId string
 
+var aksClusterName = last(split(aksClusterId, '/'))
+
+resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-02-01' existing = {
+  name: aksClusterName
+}
+
 // =============================================================================
 // RESOURCES
 // =============================================================================
@@ -82,6 +88,16 @@ resource dataCollectionRule 'Microsoft.Insights/dataCollectionRules@2022-06-01' 
   }
 }
 
+resource aksPrometheusDcrAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2022-06-01' = {
+  name: '${prometheusName}-aks-association'
+  scope: aksCluster
+  properties: {
+    description: 'Association between AKS and Prometheus DCR for Azure Managed Prometheus metrics'
+    dataCollectionRuleId: dataCollectionRule.id
+    dataCollectionEndpointId: dataCollectionEndpoint.id
+  }
+}
+
 // Azure Managed Grafana
 resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' = {
   name: grafanaName
@@ -108,12 +124,6 @@ resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' = {
   }
 }
 
-// Note: Data Collection Rule Association for AKS is configured via the AKS module's
-// azureMonitorProfile setting, not as a separate resource. The aksClusterId parameter
-// is used for reference in Grafana integrations.
-#disable-next-line no-unused-params
-var _aksRef = aksClusterId // Reference to prevent unused parameter warning
-
 // Grant Grafana Monitoring Reader on the subscription
 // Note: This may need to be done via script if Bicep RBAC fails
 resource grafanaMonitoringReaderRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -136,4 +146,6 @@ output grafanaId string = grafana.id
 output grafanaName string = grafana.name
 output grafanaEndpoint string = grafana.properties.endpoint
 output azureMonitorWorkspaceId string = azureMonitorWorkspace.id
+output dataCollectionEndpointId string = dataCollectionEndpoint.id
 output dataCollectionRuleId string = dataCollectionRule.id
+output dataCollectionRuleAssociationId string = aksPrometheusDcrAssociation.id

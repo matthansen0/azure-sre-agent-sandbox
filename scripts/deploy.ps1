@@ -250,9 +250,25 @@ try {
     Write-Host "  • AKS FQDN:         $($outputs.aksClusterFqdn.value)" -ForegroundColor White
     Write-Host "  • ACR Login Server: $($outputs.acrLoginServer.value)" -ForegroundColor White
     Write-Host "  • Key Vault URI:    $($outputs.keyVaultUri.value)" -ForegroundColor White
+    Write-Host "  • Log Analytics ID: $($outputs.logAnalyticsWorkspaceId.value)" -ForegroundColor White
+    Write-Host "  • App Insights ID:  $($outputs.appInsightsId.value)" -ForegroundColor White
     
     if ($outputs.grafanaDashboardUrl.value) {
         Write-Host "  • Grafana:          $($outputs.grafanaDashboardUrl.value)" -ForegroundColor White
+        Write-Host "  • AMW ID:           $($outputs.azureMonitorWorkspaceId.value)" -ForegroundColor White
+        Write-Host "  • Prometheus DCR:   $($outputs.prometheusDataCollectionRuleId.value)" -ForegroundColor White
+    }
+
+    if ($outputs.podRestartAlertId.value) {
+        Write-Host "  • Alert (restarts): $($outputs.podRestartAlertId.value)" -ForegroundColor White
+        Write-Host "  • Alert (HTTP 5xx): $($outputs.http5xxAlertId.value)" -ForegroundColor White
+        Write-Host "  • Alert (failures): $($outputs.podFailureAlertId.value)" -ForegroundColor White
+        Write-Host "  • Alert (crash/oom):$($outputs.crashLoopOomAlertId.value)" -ForegroundColor White
+    }
+
+    if ($outputs.defaultActionGroupId.value) {
+        Write-Host "  • Action Group:     $($outputs.defaultActionGroupId.value)" -ForegroundColor White
+        Write-Host "  • Incident Webhook: $($outputs.defaultActionGroupHasWebhook.value)" -ForegroundColor White
     }
 
     # Save outputs to file

@@ -11,6 +11,12 @@ using 'main.bicep'
 // Observability stack (Grafana + Prometheus)
 param deployObservability = true
 
+// Baseline alert rules
+param deployAlerts = true
+
+// Default action group for incident routing (add webhook at deploy time)
+param deployActionGroup = false
+
 // AKS Configuration - cost-optimized for demo
 param kubernetesVersion = '1.32'
 param systemNodeVmSize = 'Standard_D2s_v5'
