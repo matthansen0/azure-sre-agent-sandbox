@@ -88,13 +88,23 @@ resource dataCollectionRule 'Microsoft.Insights/dataCollectionRules@2022-06-01' 
   }
 }
 
-resource aksPrometheusDcrAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2022-06-01' = {
-  name: '${prometheusName}-aks-association'
+// DCE association - must be named 'configurationAccessEndpoint' per Azure requirements
+resource aksPrometheusDceAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2022-06-01' = {
+  name: 'configurationAccessEndpoint'
   scope: aksCluster
   properties: {
-    description: 'Association between AKS and Prometheus DCR for Azure Managed Prometheus metrics'
-    dataCollectionRuleId: dataCollectionRule.id
+    description: 'Data collection endpoint association for Prometheus metrics'
     dataCollectionEndpointId: dataCollectionEndpoint.id
+  }
+}
+
+// DCR association - separate resource with distinct name
+resource aksPrometheusDcrAssociation 'Microsoft.Insights/dataCollectionRuleAssociations@2022-06-01' = {
+  name: '${prometheusName}-dcr-association'
+  scope: aksCluster
+  properties: {
+    description: 'Data collection rule association for Prometheus metrics'
+    dataCollectionRuleId: dataCollectionRule.id
   }
 }
 
@@ -148,4 +158,5 @@ output grafanaEndpoint string = grafana.properties.endpoint
 output azureMonitorWorkspaceId string = azureMonitorWorkspace.id
 output dataCollectionEndpointId string = dataCollectionEndpoint.id
 output dataCollectionRuleId string = dataCollectionRule.id
+output dataCollectionEndpointAssociationId string = aksPrometheusDceAssociation.id
 output dataCollectionRuleAssociationId string = aksPrometheusDcrAssociation.id
