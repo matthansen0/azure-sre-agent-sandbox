@@ -60,6 +60,8 @@ foreach ($resource in $resources) {
     Write-Host "   • $($resource.type) - $($resource.name)" -ForegroundColor Gray
 }
 
+$keyVaultNames = @($resources | Where-Object { $_.type -eq 'Microsoft.KeyVault/vaults' } | ForEach-Object { $_.name })
+
 Write-Host "`n  Total: $($resources.Count) resources" -ForegroundColor White
 
 # Confirmation
@@ -91,6 +93,61 @@ try {
     exit 1
 }
 
+$groupDeleted = $false
+if ($keyVaultNames.Count -gt 0) {
+    Write-Host "`n🔐 Waiting for resource group deletion so Key Vault names can be purged..." -ForegroundColor Yellow
+    $deadline = (Get-Date).AddMinutes(20)
+
+    do {
+        $groupExists = az group exists --name $ResourceGroupName --output tsv 2>$null
+        if ($LASTEXITCODE -eq 0 -and $groupExists -eq 'false') {
+            $groupDeleted = $true
+            break
+        }
+
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+
+    if ($groupDeleted) {
+        Write-Host "  ✅ Resource group deleted" -ForegroundColor Green
+        Write-Host "`n🧹 Purging deleted Key Vault records to avoid name conflicts on redeploy..." -ForegroundColor Yellow
+
+        foreach ($keyVaultName in $keyVaultNames) {
+            $deletedVaultFound = $false
+            $vaultDeadline = (Get-Date).AddMinutes(5)
+
+            do {
+                $deletedCount = az keyvault list-deleted --query "[?name=='$keyVaultName'] | length(@)" --output tsv 2>$null
+                if ($LASTEXITCODE -eq 0 -and $deletedCount -eq '1') {
+                    $deletedVaultFound = $true
+                    break
+                }
+
+                Start-Sleep -Seconds 5
+            } while ((Get-Date) -lt $vaultDeadline)
+
+            if (-not $deletedVaultFound) {
+                Write-Host "   ⚠️  Deleted Key Vault entry not found for $keyVaultName; Azure may still be finalizing deletion." -ForegroundColor Yellow
+                continue
+            }
+
+            $purgeOutput = az keyvault purge --name $keyVaultName --location $($rg.location) 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   ✅ Purged $keyVaultName" -ForegroundColor Green
+            }
+            else {
+                Write-Host "   ⚠️  Failed to purge $keyVaultName" -ForegroundColor Yellow
+                if (-not [string]::IsNullOrWhiteSpace($purgeOutput)) {
+                    Write-Host "      $($purgeOutput.Trim())" -ForegroundColor Gray
+                }
+            }
+        }
+    }
+    else {
+        Write-Host "  ⚠️  Resource group deletion is still in progress. Key Vault purge was not attempted yet." -ForegroundColor Yellow
+    }
+}
+
 # Clean up local files
 Write-Host "`n🧹 Cleaning up local files..." -ForegroundColor Yellow
 
@@ -112,12 +169,10 @@ Write-Host @"
 ║                        Cleanup Complete! 🧹                                   ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  The resource group deletion is in progress.                                 ║
+║  The resource group deletion has been submitted.                             ║
 ║  Monitor progress in Azure Portal or run:                                    ║
 ║                                                                              ║
 ║    az group show --name $($ResourceGroupName.PadRight(39))║
-║                                                                              ║
-║  Don't forget to also delete your SRE Agent if you created one!              ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 

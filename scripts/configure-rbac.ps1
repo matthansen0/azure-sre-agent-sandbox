@@ -307,16 +307,35 @@ if ($grafana) {
 }
 
 # Final summary
-Write-Host @"
+if ($SreAgentPrincipalId) {
+    Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                      RBAC Configuration Complete ✅                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║                                                                              ║
-║  Note: When you create an Azure SRE Agent, you'll need to:                   ║
+║  SRE Agent managed identity roles were configured in this run.              ║
 ║                                                                              ║
-║  1. Get the SRE Agent's managed identity Object ID from Azure Portal         ║
-║  2. Run this script again with -SreAgentPrincipalId parameter:               ║
+║  SRE Agent RBAC Roles (assigned via Azure Portal):                           ║
+║  • SRE Agent Admin - Full access to create/manage agent                     ║
+║  • SRE Agent Standard User - Chat and diagnose capabilities                 ║
+║  • SRE Agent Reader - View-only access                                      ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+"@ -ForegroundColor Cyan
+}
+else {
+    Write-Host @"
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      RBAC Configuration Complete ✅                           ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  To configure SRE Agent resource roles in a standalone run:                 ║
+║                                                                              ║
+║  1. Get the SRE Agent managed identity Object ID                            ║
+║  2. Re-run this script with -SreAgentPrincipalId                            ║
 ║                                                                              ║
 ║     .\configure-rbac.ps1 -ResourceGroupName "$ResourceGroupName" ``
 ║         -SreAgentPrincipalId "<object-id>"                                   ║
@@ -329,3 +348,4 @@ Write-Host @"
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
+}

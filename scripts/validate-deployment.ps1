@@ -158,7 +158,7 @@ if ($aksName) {
 }
 
 # Test kubectl connectivity
-$kubectlTest = kubectl cluster-info 2>&1
+$null = kubectl cluster-info 2>&1
 $totalChecks++
 if (Write-Check "kubectl can connect to cluster" ($LASTEXITCODE -eq 0)) {
     $passedChecks++
@@ -314,7 +314,7 @@ if ($passedChecks -eq $totalChecks) {
 ✅ All checks passed! Your deployment is healthy.
 
 Next steps:
-1. Create SRE Agent: https://portal.azure.com/#create/Microsoft.SREAgent
+1. Open SRE Agent: https://aka.ms/sreagent/portal
 2. Break something: kubectl apply -f k8s/scenarios/oom-killed.yaml
 3. Ask SRE Agent to diagnose!
 
