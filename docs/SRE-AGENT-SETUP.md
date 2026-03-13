@@ -215,6 +215,59 @@ Connect external tools via Model Context Protocol (MCP):
 - **GitHub/Azure DevOps**: Correlate with code changes
 - **ServiceNow/PagerDuty**: Bi-directional incident management
 
+## Step 5: Configure Knowledge Base & Subagents
+
+After infrastructure deployment, configure the agent's knowledge base, subagents, and response plans using the automated configuration script.
+
+### Automated (Recommended)
+
+The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a successful deployment. To run it manually:
+
+```powershell
+# Basic configuration (knowledge base + subagents + response plan)
+.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2"
+
+# With GitHub integration
+.\scripts\configure-sre-agent.ps1 `
+    -ResourceGroupName "rg-srelab-eastus2" `
+    -GitHubPat $env:GITHUB_PAT `
+    -GitHubRepo "owner/repo"
+```
+
+### What Gets Configured
+
+| Component | Description |
+|-----------|-------------|
+| **Knowledge Base** | Runbooks for pod failures, networking, dependencies, resource exhaustion, app architecture |
+| **incident-handler** | Subagent that investigates alerts using runbooks and log analysis |
+| **cluster-health-monitor** | Subagent for proactive health checks |
+| **code-analyzer** | (GitHub only) Subagent for source code root cause analysis |
+| **Response Plan** | Auto-triggers incident-handler on pod failure alerts |
+| **GitHub MCP** | (Optional) Connector for searching code and creating issues |
+
+### Partial Re-runs
+
+If part of the configuration fails, you can skip completed steps:
+
+```powershell
+# Skip knowledge base, only re-create subagents and response plan
+.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipKnowledgeBase
+
+# Only upload knowledge base
+.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipSubagents -SkipResponsePlan
+```
+
+### Custom Runbooks
+
+To add your own runbooks:
+
+1. Create a `.md` file in `sre-config/knowledge-base/`
+2. Re-run the configuration script:
+   ```powershell
+   .\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipSubagents -SkipResponsePlan
+   ```
+3. The script auto-discovers all `*.md` files in the knowledge-base directory
+
 ## Troubleshooting SRE Agent
 
 ### Agent Can't Access AKS Resources

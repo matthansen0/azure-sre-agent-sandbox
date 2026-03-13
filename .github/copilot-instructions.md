@@ -9,6 +9,7 @@ This repository contains a fully automated Azure SRE Agent demo lab environment.
 - **Azure Key Vault** for secrets management
 - **Observability stack**: Log Analytics, Application Insights, Managed Grafana
 - **Breakable scenarios** for demonstrating SRE Agent diagnosis capabilities
+- **SRE Agent configuration layer**: Knowledge base runbooks, subagents, and response plans
 
 The app uses in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
 
@@ -16,6 +17,7 @@ The app uses in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
 
 - **Infrastructure as Code**: Bicep (modular templates in `infra/bicep/`)
 - **Container Orchestration**: Kubernetes (manifests in `k8s/`)
+- **SRE Agent Config**: YAML specs and Markdown runbooks in `sre-config/`
 - **Scripting**: PowerShell (deployment scripts in `scripts/`)
 - **Dev Environment**: Dev Containers with Azure CLI, kubectl, azd
 
@@ -29,6 +31,10 @@ The app uses in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
 ├── k8s/
 │   ├── base/              # Healthy application manifests
 │   └── scenarios/         # Breakable failure scenarios
+├── sre-config/            # SRE Agent configuration layer
+│   ├── knowledge-base/    # Runbooks uploaded to agent memory
+│   ├── agents/            # Subagent YAML specifications
+│   └── connectors/        # MCP connector templates
 ├── scripts/               # Deployment and management scripts
 ├── docs/                  # Documentation
 └── .devcontainer/         # Dev container configuration
@@ -95,6 +101,18 @@ Set `deploySreAgent = true` in parameters (default). To manage the agent after d
 - Portal: https://aka.ms/sreagent/portal
 - The deploying user is automatically assigned SRE Agent Administrator role
 
+### Configure SRE Agent (Post-Deployment)
+
+After infrastructure deployment, configure the agent with knowledge base, subagents, and response plans:
+
+```powershell
+# Basic configuration (auto-called by deploy.ps1)
+.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2"
+
+# With GitHub integration
+.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -GitHubPat $env:GITHUB_PAT -GitHubRepo "owner/repo"
+```
+
 ### Apply Breakable Scenario
 ```bash
 kubectl apply -f k8s/scenarios/oom-killed.yaml
@@ -131,3 +149,5 @@ kubectl apply -f k8s/base/application.yaml
 3. **For scripts**: Use PowerShell, include error handling, support `-WhatIf`
 4. **For docs**: Keep formatting consistent, include code examples
 5. **For new scenarios**: Add to `k8s/scenarios/` and update `docs/BREAKABLE-SCENARIOS.md`
+6. **For runbooks**: Add `.md` files to `sre-config/knowledge-base/` — auto-discovered by `configure-sre-agent.ps1`
+7. **For subagents**: Add YAML specs to `sre-config/agents/` following existing patterns

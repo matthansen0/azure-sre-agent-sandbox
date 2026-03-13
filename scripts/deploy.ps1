@@ -767,6 +767,25 @@ if ($sreAgentSkipReason -and -not $outputs.sreAgentId.value) {
     Write-Host "   Re-run without -SkipSreAgent once Microsoft.App/agents is available in the subscription." -ForegroundColor Gray
 }
 
+# Configure SRE Agent (knowledge base, subagents, response plans)
+if ($outputs.sreAgentId.value) {
+    Write-Host "`n🧠 Configuring SRE Agent (knowledge base, subagents, response plan)..." -ForegroundColor Yellow
+    $configureScript = Join-Path $PSScriptRoot "configure-sre-agent.ps1"
+    if (Test-Path $configureScript) {
+        try {
+            & $configureScript -ResourceGroupName $resourceGroupName
+            Write-Host "  ✅ SRE Agent configuration complete" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "  ⚠️  SRE Agent configuration had issues: $_" -ForegroundColor Yellow
+            Write-Host "      You can re-run it separately: .\scripts\configure-sre-agent.ps1 -ResourceGroupName $resourceGroupName" -ForegroundColor Gray
+        }
+    }
+    else {
+        Write-Host "  ⚠️  Configuration script not found. Run configure-sre-agent.ps1 manually." -ForegroundColor Yellow
+    }
+}
+
 # Final instructions
 $aksName = if ($outputs.aksClusterName.value) { $outputs.aksClusterName.value } else { "<check Azure Portal>" }
 $siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc store-front -n pets" }

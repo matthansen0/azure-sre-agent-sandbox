@@ -161,6 +161,67 @@ To set these up in the portal:
 2. Click **Create scheduled task**
 3. Enter the prompt and set the schedule (e.g., cron: `0 * * * *` for hourly)
 
+### Pre-Configured Subagents
+
+When you run `configure-sre-agent.ps1` (or let `deploy.ps1` call it automatically), these subagents are created:
+
+| Subagent | Purpose | GitHub Required |
+|----------|---------|----------------|
+| **incident-handler** | Investigates alerts using knowledge base runbooks, collects evidence, identifies root cause | No (core) / Yes (full — creates GitHub issues) |
+| **cluster-health-monitor** | Proactive health checks across pods, nodes, and resource utilization | No |
+| **code-analyzer** | Correlates production errors with source code, creates detailed incident reports | Yes |
+
+#### Using Subagents
+
+After configuration, you can invoke subagents directly:
+
+| Prompt | Subagent | What It Does |
+|--------|----------|-------------|
+| "Investigate the pod failures in the pets namespace" | incident-handler | Runs the pod-failures runbook, queries logs, reports findings |
+| "Run a health check on my cluster" | cluster-health-monitor | Checks all pods, nodes, and services, reports status |
+| "Analyze the source code for the root cause of order-service failures" | code-analyzer | Searches GitHub code, correlates with logs, creates an issue |
+
+#### Incident Response Plan
+
+The configuration script also creates a response plan that auto-triggers the `incident-handler` subagent when pod failure alerts fire. This means:
+
+1. A breakable scenario causes pod crashes
+2. Azure Monitor fires an alert
+3. The SRE Agent picks up the alert
+4. The `incident-handler` subagent runs the relevant runbook automatically
+5. Findings are summarized (and optionally written to a GitHub issue)
+
+### Knowledge Base
+
+The following runbooks are uploaded to the agent's knowledge base:
+
+| Document | Content |
+|----------|---------|
+| `aks-pod-failures.md` | OOMKilled, CrashLoopBackOff, ImagePullBackOff, Pending, Probe, Config errors |
+| `network-connectivity.md` | Network policy blocks, service selector mismatches, DNS issues |
+| `dependency-failures.md` | MongoDB/RabbitMQ outages, cascading failure analysis |
+| `resource-exhaustion.md` | CPU contention, memory pressure, scheduling failures, node health |
+| `app-architecture.md` | Service map, dependencies, ports, storage, common failure modes |
+| `incident-report-template.md` | Structured template for GitHub incident reports |
+
+> **Tip:** You can add custom runbooks to `sre-config/knowledge-base/` and re-run `configure-sre-agent.ps1` to upload them.
+
+### GitHub MCP Integration (Optional)
+
+When you provide a GitHub PAT, the configuration script enables:
+
+- **GitHub MCP connector** — lets the agent search code, read files, and create issues
+- **Full incident-handler** — upgraded to create GitHub issues with structured reports
+- **code-analyzer subagent** — deep source code root cause analysis
+
+To add GitHub integration after initial setup:
+```powershell
+.\scripts\configure-sre-agent.ps1 `
+    -ResourceGroupName "rg-srelab-eastus2" `
+    -GitHubPat $env:GITHUB_PAT `
+    -GitHubRepo "owner/repo"
+```
+
 ---
 
 ## "What Changed?" Correlation
