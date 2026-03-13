@@ -258,16 +258,25 @@ if (-not $SkipSubagents) {
 
                 $putUrl = "https://management.azure.com${agentId}/subagents/$($agentSpec.Name)?api-version=${apiVersion}"
 
-                az rest --method PUT `
+                $restError = az rest --method PUT `
                     --url $putUrl `
                     --body $putBody `
-                    --output none 2>$null
+                    --output json 2>&1
 
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host "    ✅ Created $($agentSpec.Name)" -ForegroundColor Green
                 }
                 else {
-                    Write-Host "    ⚠️  Failed to create $($agentSpec.Name) (HTTP error)" -ForegroundColor Yellow
+                    $errMsg = "$restError"
+                    if ($errMsg -match 'not available for this tenant') {
+                        Write-Host "    ℹ️  Subagents not available — this is a preview feature restricted to internal tenants" -ForegroundColor Gray
+                        Write-Host "       The YAML specs in sre-config/agents/ are ready for when the feature becomes available" -ForegroundColor Gray
+                        break  # Skip remaining subagents
+                    }
+                    else {
+                        Write-Host "    ⚠️  Failed to create $($agentSpec.Name)" -ForegroundColor Yellow
+                        if ($errMsg.Length -gt 0) { Write-Host "       $($errMsg.Substring(0, [Math]::Min(200, $errMsg.Length)))" -ForegroundColor Gray }
+                    }
                 }
             }
             catch {
@@ -317,12 +326,17 @@ if (-not $SkipResponsePlan) {
 
         $lines = $curlOutput -split "`n"
         $httpCode = $lines[-1].Trim()
+        $respBody = ($lines[0..($lines.Count-2)]) -join "`n"
 
         if ($httpCode -eq '200' -or $httpCode -eq '201' -or $httpCode -eq '204') {
             Write-Host "  ✅ Response plan created" -ForegroundColor Green
         }
-        elseif ($httpCode -eq '405' -or $httpCode -eq '409') {
-            Write-Host "  ℹ️  Response plan may already exist (HTTP $httpCode)" -ForegroundColor Gray
+        elseif ($httpCode -eq '409') {
+            Write-Host "  ✅ Response plan already exists" -ForegroundColor Green
+        }
+        elseif ($httpCode -eq '405' -or ($respBody -match '<!doctype html>')) {
+            Write-Host "  ℹ️  Response plan API not yet available at this endpoint (preview limitation)" -ForegroundColor Gray
+            Write-Host "     You can create response plans manually in the SRE Agent portal" -ForegroundColor Gray
         }
         else {
             Write-Host "  ⚠️  Response plan creation returned HTTP $httpCode" -ForegroundColor Yellow
