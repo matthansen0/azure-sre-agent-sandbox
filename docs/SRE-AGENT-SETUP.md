@@ -215,16 +215,16 @@ Connect external tools via Model Context Protocol (MCP):
 - **GitHub/Azure DevOps**: Correlate with code changes
 - **ServiceNow/PagerDuty**: Bi-directional incident management
 
-## Step 5: Configure Knowledge Base & Subagents
+## Step 5: Configure Knowledge Base & Custom Agents
 
-After infrastructure deployment, configure the agent's knowledge base, subagents, and response plans using the automated configuration script.
+After infrastructure deployment, configure the agent's knowledge base, custom agents, connectors, and scheduled tasks using the automated configuration script. This uses the **dataplane v2 API** (`{agentEndpoint}/api/v2/extendedAgent/`).
 
 ### Automated (Recommended)
 
 The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a successful deployment. To run it manually:
 
 ```powershell
-# Basic configuration (knowledge base + subagents + response plan)
+# Basic configuration (knowledge base + agents + connectors + scheduled tasks)
 .\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2"
 
 # With GitHub integration
@@ -239,22 +239,25 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 | Component | Description |
 |-----------|-------------|
 | **Knowledge Base** | Runbooks for pod failures, networking, dependencies, resource exhaustion, app architecture |
-| **incident-handler** | Subagent that investigates alerts using runbooks and log analysis |
-| **cluster-health-monitor** | Subagent for proactive health checks |
-| **code-analyzer** | (GitHub only) Subagent for source code root cause analysis |
-| **Response Plan** | Auto-triggers incident-handler on pod failure alerts |
+| **incident-handler** | Custom agent that investigates alerts using runbooks and log analysis |
+| **cluster-health-monitor** | Custom agent for proactive health checks |
+| **code-analyzer** | (GitHub only) Custom agent for source code root cause analysis |
+| **Azure Monitor** | Connector for incident detection and alerting |
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
+| **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
+
+> **Note:** Incident response plans must be created manually in the [SRE Agent portal](https://sre.azure.com) — the script prints guidance for this.
 
 ### Partial Re-runs
 
 If part of the configuration fails, you can skip completed steps:
 
 ```powershell
-# Skip knowledge base, only re-create subagents and response plan
+# Skip knowledge base, only re-create agents and connectors
 .\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipKnowledgeBase
 
 # Only upload knowledge base
-.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipSubagents -SkipResponsePlan
+.\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipAgents -SkipConnectors -SkipScheduledTasks
 ```
 
 ### Custom Runbooks
@@ -264,7 +267,7 @@ To add your own runbooks:
 1. Create a `.md` file in `sre-config/knowledge-base/`
 2. Re-run the configuration script:
    ```powershell
-   .\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipSubagents -SkipResponsePlan
+   .\scripts\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2" -SkipAgents -SkipConnectors -SkipScheduledTasks
    ```
 3. The script auto-discovers all `*.md` files in the knowledge-base directory
 

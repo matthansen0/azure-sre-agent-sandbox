@@ -1,11 +1,12 @@
-# GitHub MCP Connector
-# The PLACEHOLDER_GITHUB_PAT token is replaced by the configure script
-api_version: azuresre.ai/v1
+# GitHub MCP Connector — Dataplane v2 API format
+# Created by configure-sre-agent.ps1 when -GitHubPat is provided
+# Reference: PUT {agentEndpoint}/api/v2/extendedAgent/connectors/github-mcp
+api_version: azuresre.ai/v2
 kind: DataConnector
 spec:
   name: github-mcp
-  type: Mcp
-  endpoint: https://api.githubcopilot.com/mcp/
-  auth:
-    type: BearerToken
-    token: PLACEHOLDER_GITHUB_PAT
+  dataConnectorType: StreamableHttp
+  dataSource: github
+  serverUri: https://api.githubcopilot.com/mcp/
+  authenticationType: BearerToken
+  # Token is passed at runtime via -GitHubPat parameter

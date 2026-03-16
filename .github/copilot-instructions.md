@@ -9,7 +9,7 @@ This repository contains a fully automated Azure SRE Agent demo lab environment.
 - **Azure Key Vault** for secrets management
 - **Observability stack**: Log Analytics, Application Insights, Managed Grafana
 - **Breakable scenarios** for demonstrating SRE Agent diagnosis capabilities
-- **SRE Agent configuration layer**: Knowledge base runbooks, subagents, and response plans
+- **SRE Agent configuration layer**: Knowledge base runbooks, custom agents, connectors, and scheduled tasks
 
 The app uses in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
 
@@ -33,7 +33,7 @@ The app uses in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
 │   └── scenarios/         # Breakable failure scenarios
 ├── sre-config/            # SRE Agent configuration layer
 │   ├── knowledge-base/    # Runbooks uploaded to agent memory
-│   ├── agents/            # Subagent YAML specifications
+│   ├── agents/            # Custom agent YAML specifications
 │   └── connectors/        # MCP connector templates
 ├── scripts/               # Deployment and management scripts
 ├── docs/                  # Documentation
@@ -103,7 +103,7 @@ Set `deploySreAgent = true` in parameters (default). To manage the agent after d
 
 ### Configure SRE Agent (Post-Deployment)
 
-After infrastructure deployment, configure the agent with knowledge base, subagents, and response plans:
+After infrastructure deployment, configure the agent with knowledge base, custom agents, connectors, and scheduled tasks via the dataplane v2 API:
 
 ```powershell
 # Basic configuration (auto-called by deploy.ps1)
@@ -150,4 +150,4 @@ kubectl apply -f k8s/base/application.yaml
 4. **For docs**: Keep formatting consistent, include code examples
 5. **For new scenarios**: Add to `k8s/scenarios/` and update `docs/BREAKABLE-SCENARIOS.md`
 6. **For runbooks**: Add `.md` files to `sre-config/knowledge-base/` — auto-discovered by `configure-sre-agent.ps1`
-7. **For subagents**: Add YAML specs to `sre-config/agents/` following existing patterns
+7. **For custom agents**: Add YAML specs to `sre-config/agents/` following existing patterns

@@ -767,9 +767,9 @@ if ($sreAgentSkipReason -and -not $outputs.sreAgentId.value) {
     Write-Host "   Re-run without -SkipSreAgent once Microsoft.App/agents is available in the subscription." -ForegroundColor Gray
 }
 
-# Configure SRE Agent (knowledge base, subagents, response plans)
+# Configure SRE Agent (knowledge base, custom agents, connectors, scheduled tasks)
 if ($outputs.sreAgentId.value) {
-    Write-Host "`n🧠 Configuring SRE Agent (knowledge base, subagents, response plan)..." -ForegroundColor Yellow
+    Write-Host "`n🧠 Configuring SRE Agent (knowledge base, agents, connectors)..." -ForegroundColor Yellow
     $configureScript = Join-Path $PSScriptRoot "configure-sre-agent.ps1"
     if (Test-Path $configureScript) {
         try {
