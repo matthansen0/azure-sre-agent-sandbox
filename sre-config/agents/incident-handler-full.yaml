@@ -18,12 +18,15 @@ spec:
        template from the knowledge base. Include structured sections for
        Summary, Impact, Timeline, Evidence, Root Cause, Remediation,
        and Action Items. Fill out EVERY section completely.
+    6. Send an email summary with your analysis, the GitHub issue link,
+       root cause, and recommended next steps using SendOutlookEmail.
+       Subject line: "[SRE Agent] <severity>: <short description>"
 
     Always search memory for similar past incidents first.
     Use ExecutePythonCode to plot metrics charts when presenting evidence.
     Search memory for "incident report template" and follow that format
     exactly when creating GitHub issues.
-  handoff_description: Investigates AKS incidents using runbooks and creates GitHub issues with findings
+  handoff_description: Investigates AKS incidents using runbooks, creates GitHub issues, and emails findings
   agent_type: Autonomous
   tools:
     - SearchMemory
@@ -33,5 +36,6 @@ spec:
     - QueryLogAnalyticsByWorkspaceId
     - QueryAppInsightsByResourceId
     - ExecutePythonCode
+    - SendOutlookEmail
   mcp_tools:
     - github-mcp/*

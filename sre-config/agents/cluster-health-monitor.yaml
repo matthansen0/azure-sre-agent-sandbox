@@ -19,9 +19,11 @@ spec:
        - Resource utilization summary
        - Any active issues or warnings
        - Recommended actions if issues found
+    7. Send the health report via email using SendOutlookEmail.
+       Subject line: "[SRE Agent] Daily Health: <Healthy|Degraded|Critical>"
 
     Always search memory for baseline metrics to compare against.
-  handoff_description: Proactive AKS cluster and application health monitoring
+  handoff_description: Proactive AKS cluster and application health monitoring with email reports
   agent_type: Autonomous
   tools:
     - SearchMemory
@@ -30,3 +32,4 @@ spec:
     - QueryLogAnalyticsByWorkspaceId
     - QueryAppInsightsByResourceId
     - ExecutePythonCode
+    - SendOutlookEmail

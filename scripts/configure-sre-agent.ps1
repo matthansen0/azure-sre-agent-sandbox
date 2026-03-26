@@ -412,16 +412,94 @@ if (-not $SkipConnectors) {
     else {
         Write-Host "  🔗 GitHub connector — ⏭️  Skipped (no PAT provided)" -ForegroundColor Gray
     }
+
+    # 3c: Outlook connector (always — enables SendOutlookEmail tool)
+    Write-Host "  📧 Creating Outlook connector..." -ForegroundColor Gray
+
+    $outlookBody = @{
+        name       = "outlook"
+        properties = @{
+            dataConnectorType = "Outlook"
+            dataSource        = "outlook"
+        }
+    } | ConvertTo-Json -Depth 5 -Compress
+
+    $resp = Invoke-DataplaneApi `
+        -Method PUT `
+        -Path "/api/v2/extendedAgent/connectors/outlook" `
+        -Body $outlookBody `
+        -Token $token
+
+    if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 202) {
+        Write-Host "    ✅ Outlook connector created" -ForegroundColor Green
+        Write-Host "    📌 Authorize in portal: https://sre.azure.com → Settings → Connectors → Outlook → Authorize" -ForegroundColor Gray
+    }
+    else {
+        Write-Host "    ⚠️  HTTP $($resp.StatusCode) — Outlook connector may need manual setup" -ForegroundColor Yellow
+        Write-Host "       Create it in the portal: Settings → Connectors → Add → Outlook" -ForegroundColor Gray
+    }
 }
 else {
     Write-Host "`n🔌 Step 3: Skipping connector creation (-SkipConnectors)" -ForegroundColor Gray
 }
 
 # ============================================================================
-# Step 4: Create Scheduled Tasks
+# Step 4: Create Incident Response Plan (best-effort via API)
+# ============================================================================
+Write-Host "`n🚨 Step 4: Attempting incident response plan creation..." -ForegroundColor Yellow
+
+$token = Get-SreAgentToken
+
+# Try the v2 incidentFilters endpoint — this may fail if the API doesn't support
+# creation yet, or if an incident management platform (PagerDuty/ServiceNow) is required.
+$incidentFilterBody = @{
+    name       = "aks-pod-failure-handler"
+    type       = "IncidentFilter"
+    properties = @{
+        description     = "Routes AKS pod failure incidents to the incident-handler subagent"
+        severities      = @("Sev1", "Sev2", "Sev3")
+        titleContains   = "pod"
+        agentName       = "incident-handler"
+        agentAutonomy   = "Review"
+        enabled         = $true
+    }
+} | ConvertTo-Json -Depth 5 -Compress
+
+$resp = Invoke-DataplaneApi `
+    -Method PUT `
+    -Path "/api/v2/extendedAgent/incidentFilters/aks-pod-failure-handler" `
+    -Body $incidentFilterBody `
+    -Token $token
+
+if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 202) {
+    Write-Host "  ✅ Incident filter 'aks-pod-failure-handler' created" -ForegroundColor Green
+    Write-Host "     Incidents matching 'pod' in title → incident-handler subagent" -ForegroundColor Gray
+}
+else {
+    Write-Host "  ⚠️  HTTP $($resp.StatusCode) — Incident filter API not yet supported" -ForegroundColor Yellow
+    Write-Host "     This is expected — create manually in the portal (see guidance below)" -ForegroundColor Gray
+}
+
+# Also try listing existing incident filters to see current state
+$listResp = Invoke-DataplaneApi -Method GET -Path "/api/v2/extendedAgent/incidentFilters" -Token $token
+if ($listResp.StatusCode -eq 200) {
+    try {
+        $filterList = ($listResp.Body | ConvertFrom-Json).value
+        if ($filterList.Count -gt 0) {
+            Write-Host "  📊 $($filterList.Count) incident filter(s) registered" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  📊 No incident filters registered yet" -ForegroundColor Gray
+        }
+    }
+    catch {}
+}
+
+# ============================================================================
+# Step 5: Create Scheduled Tasks
 # ============================================================================
 if (-not $SkipScheduledTasks) {
-    Write-Host "`n⏰ Step 4: Creating scheduled health check..." -ForegroundColor Yellow
+    Write-Host "`n⏰ Step 5: Creating scheduled health check..." -ForegroundColor Yellow
 
     $token = Get-SreAgentToken
 
@@ -450,11 +528,11 @@ if (-not $SkipScheduledTasks) {
     }
 }
 else {
-    Write-Host "`n⏰ Step 4: Skipping scheduled tasks (-SkipScheduledTasks)" -ForegroundColor Gray
+    Write-Host "`n⏰ Step 5: Skipping scheduled tasks (-SkipScheduledTasks)" -ForegroundColor Gray
 }
 
 # ============================================================================
-# Step 5: Summary and Portal Guidance
+# Step 6: Summary and Portal Guidance
 # ============================================================================
 $hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat)
 
@@ -466,6 +544,7 @@ Write-Host @"
 ║  ✅ Knowledge Base: Runbooks uploaded to Agent Memory                        ║
 ║  ✅ Custom Agents:  incident-handler, cluster-health-monitor                 ║
 $(if ($hasGitHub) { "║  ✅ Custom Agents:  code-analyzer (GitHub enabled)                         ║`n" } else { "" })║  ✅ Connector:      Azure Monitor (incident source)                          ║
+║  ✅ Connector:      Outlook (email delivery — authorize in portal)           ║
 $(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis)                      ║`n" } else { "" })║  ✅ Scheduled Task: daily-health-check (08:00 UTC)                           ║
 ║                                                                              ║
 ║  Portal: https://sre.azure.com                                               ║
@@ -473,10 +552,21 @@ $(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis) 
 
 "@ -ForegroundColor Cyan
 
-# Incident response plan guidance (must be created in portal)
-Write-Host "📋 Incident Response Plan (create in portal):" -ForegroundColor Yellow
-Write-Host "   The incident filter API doesn't support creation yet." -ForegroundColor Gray
-Write-Host "   Create one manually in the portal:" -ForegroundColor Gray
+# Outlook authorization reminder
+Write-Host "📧 Outlook Authorization (required for email delivery):" -ForegroundColor Yellow
+Write-Host "   The Outlook connector was created but must be authorized in the portal:" -ForegroundColor Gray
+Write-Host ""
+Write-Host "   1. Open https://sre.azure.com → your agent → Settings → Connectors" -ForegroundColor White
+Write-Host "   2. Find the Outlook connector and click 'Authorize'" -ForegroundColor White
+Write-Host "   3. Sign in with the account that should send incident emails" -ForegroundColor White
+Write-Host "   4. Once authorized, agents can use SendOutlookEmail to deliver results" -ForegroundColor White
+Write-Host ""
+
+# Incident response plan guidance
+Write-Host "📋 Incident Response Plan:" -ForegroundColor Yellow
+Write-Host "   The script attempted to create an incident filter via the API." -ForegroundColor Gray
+Write-Host "   If it failed (common — API may not support creation yet)," -ForegroundColor Gray
+Write-Host "   create one manually in the portal:" -ForegroundColor Gray
 Write-Host ""
 Write-Host "   1. Open https://sre.azure.com → your agent" -ForegroundColor White
 Write-Host "   2. Go to Builder → Incident response plans" -ForegroundColor White
@@ -489,9 +579,10 @@ Write-Host "      • Agent autonomy:  Review" -ForegroundColor White
 Write-Host ""
 
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Open https://sre.azure.com and verify your agent configuration" -ForegroundColor White
-Write-Host "  2. Check Builder → Agent Canvas to see agents and triggers" -ForegroundColor White
-Write-Host "  3. Apply a breakable scenario: break-oom, break-crash, etc." -ForegroundColor White
-Write-Host "  4. Ask the agent: 'Why are pods crashing in the pets namespace?'" -ForegroundColor White
-Write-Host "  5. Or invoke directly: /agent incident-handler" -ForegroundColor White
+Write-Host "  1. Authorize Outlook connector in the portal (see above)" -ForegroundColor White
+Write-Host "  2. Open https://sre.azure.com and verify your agent configuration" -ForegroundColor White
+Write-Host "  3. Check Builder → Agent Canvas to see agents and triggers" -ForegroundColor White
+Write-Host "  4. Apply a breakable scenario: break-oom, break-crash, etc." -ForegroundColor White
+Write-Host "  5. Ask the agent: 'Why are pods crashing in the pets namespace?'" -ForegroundColor White
+Write-Host "  6. Or invoke directly: /agent incident-handler" -ForegroundColor White
 Write-Host ""

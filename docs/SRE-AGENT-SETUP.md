@@ -239,14 +239,39 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 | Component | Description |
 |-----------|-------------|
 | **Knowledge Base** | Runbooks for pod failures, networking, dependencies, resource exhaustion, app architecture |
-| **incident-handler** | Custom agent that investigates alerts using runbooks and log analysis |
-| **cluster-health-monitor** | Custom agent for proactive health checks |
+| **incident-handler** | Custom agent that investigates alerts using runbooks, log analysis, and emails results |
+| **cluster-health-monitor** | Custom agent for proactive health checks with email reports |
 | **code-analyzer** | (GitHub only) Custom agent for source code root cause analysis |
 | **Azure Monitor** | Connector for incident detection and alerting |
+| **Outlook** | Connector for email delivery (requires portal authorization) |
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
+| **aks-pod-failure-handler** | Incident filter routing pod alerts to incident-handler (API or portal) |
 
 > **Note:** Incident response plans must be created manually in the [SRE Agent portal](https://sre.azure.com) — the script prints guidance for this.
+
+### Post-Configuration: Authorize Outlook
+
+The Outlook connector enables the `SendOutlookEmail` tool so agents can email you incident analysis and health reports. After the script runs:
+
+1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Settings** → **Connectors**
+2. Find the **Outlook** connector and click **Authorize**
+3. Sign in with the account that should send incident emails
+4. Once authorized, agents will email findings for incidents and scheduled health checks
+
+### Post-Configuration: Create Incident Response Plan
+
+The script attempts to create an incident filter via the API. If it fails (the API may not support creation yet), create one in the portal:
+
+1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Builder** → **Incident response plans**
+2. Click **New incident response plan**
+3. Configure:
+   - **Name:** AKS Pod Failure Handler
+   - **Severity:** Sev1, Sev2, Sev3
+   - **Title contains:** pod
+   - **Response agent:** incident-handler
+   - **Agent autonomy:** Review
+4. Save — incidents matching the filter will automatically trigger the subagent
 
 ### Partial Re-runs
 
