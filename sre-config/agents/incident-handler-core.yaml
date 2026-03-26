@@ -16,6 +16,9 @@ spec:
     4. Identify the root cause and trace any cascading dependencies.
     5. Provide a summary with findings, evidence, root cause, and
        recommended remediation.
+    6. Send an email summary with your analysis, evidence collected,
+       root cause, and recommended next steps using SendOutlookEmail.
+       Subject line: "[SRE Agent] <severity>: <short description>"
 
     Always search memory for similar past incidents first.
     Use ExecutePythonCode to plot metrics charts when presenting evidence.
@@ -29,3 +32,4 @@ spec:
     - QueryLogAnalyticsByWorkspaceId
     - QueryAppInsightsByResourceId
     - ExecutePythonCode
+    - SendOutlookEmail

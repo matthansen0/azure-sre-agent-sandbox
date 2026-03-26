@@ -1,0 +1,10 @@
+# Outlook Connector — Dataplane v2 API format
+# Enables SendOutlookEmail tool for agents to deliver analysis results via email.
+# Must be authorized in the SRE Agent portal after creation (OAuth consent flow).
+# Reference: PUT {agentEndpoint}/api/v2/extendedAgent/connectors/outlook
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: outlook
+  dataConnectorType: Outlook
+  dataSource: outlook
