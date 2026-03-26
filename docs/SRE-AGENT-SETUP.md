@@ -246,7 +246,6 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 | **Outlook** | Connector for email delivery (requires portal authorization) |
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
-| **aks-pod-failure-handler** | Incident filter routing pod alerts to incident-handler (API or portal) |
 
 > **Note:** Incident response plans must be created manually in the [SRE Agent portal](https://sre.azure.com) — the script prints guidance for this.
 
@@ -261,7 +260,7 @@ The Outlook connector enables the `SendOutlookEmail` tool so agents can email yo
 
 ### Post-Configuration: Create Incident Response Plan
 
-The script attempts to create an incident filter via the API. If it fails (the API may not support creation yet), create one in the portal:
+Incident response plans **cannot** be created via the dataplane API — the `incidentFilters` endpoint is read-only. Create one in the portal:
 
 1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Builder** → **Incident response plans**
 2. Click **New incident response plan**

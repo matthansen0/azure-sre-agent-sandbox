@@ -444,55 +444,36 @@ else {
 }
 
 # ============================================================================
-# Step 4: Create Incident Response Plan (best-effort via API)
+# Step 4: Probe Incident Filter API (read-only — creation not supported via API)
 # ============================================================================
-Write-Host "`n🚨 Step 4: Attempting incident response plan creation..." -ForegroundColor Yellow
+Write-Host "`n🚨 Step 4: Checking incident filter status..." -ForegroundColor Yellow
 
 $token = Get-SreAgentToken
 
-# Try the v2 incidentFilters endpoint — this may fail if the API doesn't support
-# creation yet, or if an incident management platform (PagerDuty/ServiceNow) is required.
-$incidentFilterBody = @{
-    name       = "aks-pod-failure-handler"
-    type       = "IncidentFilter"
-    properties = @{
-        description     = "Routes AKS pod failure incidents to the incident-handler subagent"
-        severities      = @("Sev1", "Sev2", "Sev3")
-        titleContains   = "pod"
-        agentName       = "incident-handler"
-        agentAutonomy   = "Review"
-        enabled         = $true
-    }
-} | ConvertTo-Json -Depth 5 -Compress
-
-$resp = Invoke-DataplaneApi `
-    -Method PUT `
-    -Path "/api/v2/extendedAgent/incidentFilters/aks-pod-failure-handler" `
-    -Body $incidentFilterBody `
-    -Token $token
-
-if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 202) {
-    Write-Host "  ✅ Incident filter 'aks-pod-failure-handler' created" -ForegroundColor Green
-    Write-Host "     Incidents matching 'pod' in title → incident-handler subagent" -ForegroundColor Gray
-}
-else {
-    Write-Host "  ⚠️  HTTP $($resp.StatusCode) — Incident filter API not yet supported" -ForegroundColor Yellow
-    Write-Host "     This is expected — create manually in the portal (see guidance below)" -ForegroundColor Gray
-}
-
-# Also try listing existing incident filters to see current state
+# The incidentFilters endpoint supports GET (list) but creation (PUT) is not
+# supported via the dataplane API — incident response plans must be created
+# in the portal. We probe here to show current state.
 $listResp = Invoke-DataplaneApi -Method GET -Path "/api/v2/extendedAgent/incidentFilters" -Token $token
 if ($listResp.StatusCode -eq 200) {
     try {
         $filterList = ($listResp.Body | ConvertFrom-Json).value
         if ($filterList.Count -gt 0) {
-            Write-Host "  📊 $($filterList.Count) incident filter(s) registered" -ForegroundColor Green
+            Write-Host "  📊 $($filterList.Count) incident filter(s) registered:" -ForegroundColor Green
+            foreach ($filter in $filterList) {
+                Write-Host "     • $($filter.name)" -ForegroundColor Gray
+            }
         }
         else {
             Write-Host "  📊 No incident filters registered yet" -ForegroundColor Gray
+            Write-Host "     Create one in the portal (see guidance below)" -ForegroundColor Gray
         }
     }
-    catch {}
+    catch {
+        Write-Host "  📊 Could not parse incident filter response" -ForegroundColor Gray
+    }
+}
+else {
+    Write-Host "  ⚠️  HTTP $($listResp.StatusCode) — could not check incident filters" -ForegroundColor Yellow
 }
 
 # ============================================================================
@@ -563,10 +544,9 @@ Write-Host "   4. Once authorized, agents can use SendOutlookEmail to deliver re
 Write-Host ""
 
 # Incident response plan guidance
-Write-Host "📋 Incident Response Plan:" -ForegroundColor Yellow
-Write-Host "   The script attempted to create an incident filter via the API." -ForegroundColor Gray
-Write-Host "   If it failed (common — API may not support creation yet)," -ForegroundColor Gray
-Write-Host "   create one manually in the portal:" -ForegroundColor Gray
+Write-Host "📋 Incident Response Plan (portal only — API is read-only):" -ForegroundColor Yellow
+Write-Host "   Incident filters cannot be created via the dataplane API." -ForegroundColor Gray
+Write-Host "   Create one in the portal:" -ForegroundColor Gray
 Write-Host ""
 Write-Host "   1. Open https://sre.azure.com → your agent" -ForegroundColor White
 Write-Host "   2. Go to Builder → Incident response plans" -ForegroundColor White
