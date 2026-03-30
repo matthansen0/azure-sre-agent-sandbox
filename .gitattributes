@@ -1,0 +1,18 @@
+# Shell scripts must use LF (Linux/macOS execution)
+*.sh text eol=lf
+
+# PowerShell scripts - LF for cross-platform (dev containers)
+*.ps1 text eol=lf
+
+# Infrastructure and config files
+*.bicep text eol=lf
+*.bicepparam text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+
+# Documentation
+*.md text eol=lf
+
+# Binary files
+*.png binary
