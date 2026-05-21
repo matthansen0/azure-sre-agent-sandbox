@@ -357,8 +357,11 @@ jobs:
             --color BFD4F2 \
             2>/dev/null || true
 
-          title="Lab-rot watch: review needed (week of $(date -u +%Y-%m-%d))"
+          today=$(date -u +%Y-%m-%d)
+          findings_hash=$(printf '%s' "$FINDINGS" | sha256sum | awk '{print $1}')
+          title="Lab-rot watch: review needed (week of $today)"
           body=$(cat <<EOF
+          <!-- lab-rot-findings-hash:$findings_hash -->
           Weekly static-analysis sweep flagged the following. **No live deployment was performed.**
 
           $FINDINGS
@@ -371,9 +374,29 @@ jobs:
           EOF
           )
 
-          existing=$(gh issue list --label lab-rot --state open --search "$title in:title" --json number --jq '.[0].number' || echo "")
+          issues_json=$(gh issue list --label lab-rot --state open --limit 100 --json number,body)
+          existing=$(jq -r \
+            --arg hash "$findings_hash" \
+            --arg findings "$FINDINGS" \
+            '.[]
+            | select(
+                (.body | contains("<!-- lab-rot-findings-hash:" + $hash + " -->"))
+                or (.body | contains($findings))
+              )
+            | .number' <<< "$issues_json" | head -n1)
+
           if [[ -n "$existing" ]]; then
-            gh issue comment "$existing" --body "$body"
+            comment_body="Lab-rot watch reran on $today and found the same findings are still present."
+            comments_json=$(gh api "repos/$GITHUB_REPOSITORY/issues/$existing/comments" --paginate)
+            existing_comment=$(jq -r \
+              --arg body "$comment_body" \
+              '.[] | select(.body | contains($body)) | .id' <<< "$comments_json" | head -n1 || true)
+
+            if [[ -z "$existing_comment" ]]; then
+              gh issue comment "$existing" --body "$comment_body"
+            else
+              echo "Matching issue #$existing already has a same-day status comment."
+            fi
           else
             gh issue create \
               --title "$title" \
