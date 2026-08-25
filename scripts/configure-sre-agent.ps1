@@ -280,6 +280,11 @@ if (-not $SkipAgents) {
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  📦 Installing pyyaml..." -ForegroundColor Gray
             & $python -m pip install --user pyyaml 2>$null
+            & $python -c "import yaml" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                # Debian/Ubuntu externally-managed environments (PEP 668) reject --user installs
+                & $python -m pip install --user --break-system-packages pyyaml 2>$null
+            }
         }
 
         # Determine which agents to create

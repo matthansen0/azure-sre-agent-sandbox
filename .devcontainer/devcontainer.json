@@ -14,6 +14,10 @@
         "ghcr.io/devcontainers/features/powershell:1": {
             "version": "latest"
         },
+        "ghcr.io/devcontainers/features/python:1": {
+            "version": "3.12",
+            "installTools": true
+        },
         "ghcr.io/azure/azure-dev/azd:latest": {}
     },
     "customizations": {

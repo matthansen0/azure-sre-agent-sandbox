@@ -10,6 +10,13 @@ set -e
 
 echo "🔧 Setting up Azure SRE Agent Demo Lab dev container..."
 
+# Ensure Python + PyYAML are available for scripts/yaml-to-agent-json.py
+echo "🐍 Ensuring Python and PyYAML are available..."
+if ! command -v python3 &> /dev/null; then
+    sudo apt-get update -qq && sudo apt-get install -y -qq python3 python3-pip
+fi
+python3 -m pip install --user --quiet pyyaml || python3 -m pip install --break-system-packages --quiet pyyaml
+
 # Install additional tools
 echo "📦 Installing additional tools..."
 
