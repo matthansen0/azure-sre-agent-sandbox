@@ -12,9 +12,9 @@ The pets e-commerce application is a multi-service application deployed on Azure
 |---------|----------|------|-------------|
 | store-front | Vue.js / Node.js | 8080 | Customer web storefront |
 | store-admin | Vue.js / Node.js | 8081 | Admin dashboard |
-| order-service | Go / Node.js | 3000 | Order creation and management API |
-| product-service | Go / Node.js | 3002 | Product catalog API |
-| makeline-service | Go / Node.js | 3001 | Order fulfillment processor |
+| order-service | Node.js | 3000 | Order creation and management API |
+| product-service | Rust | 3002 | Product catalog API |
+| makeline-service | Go | 3001 | Order fulfillment processor |
 | virtual-customer | Node.js | — | Simulates customer traffic placing orders |
 | virtual-worker | Node.js | — | Simulates workers completing orders |
 
@@ -55,13 +55,13 @@ All resources are deployed in the `pets` namespace.
 ### Deployments
 - `mongodb` — 1 replica, attached to `mongodb-data-pvc`
 - `rabbitmq` — 1 replica, in-memory
-- `product-service` — 1 replica
-- `order-service` — 1 replica
-- `makeline-service` — 1 replica
-- `store-front` — 1 replica, type LoadBalancer (external)
-- `store-admin` — 1 replica
+- `product-service` — 2 replicas
+- `order-service` — 2 replicas
+- `makeline-service` — 2 replicas
+- `store-front` — 2 replicas, type LoadBalancer (external)
+- `store-admin` — 1 replica, type LoadBalancer (external)
 - `virtual-customer` — 1 replica
-- `virtual-worker` — 1 replica
+- `virtual-worker` — 0 replicas (disabled because of the RabbitMQ protocol mismatch)
 
 ### Services
 - `mongodb` — ClusterIP on port 27017
@@ -70,7 +70,7 @@ All resources are deployed in the `pets` namespace.
 - `order-service` — ClusterIP on port 3000
 - `makeline-service` — ClusterIP on port 3001
 - `store-front` — LoadBalancer on port 80 → 8080
-- `store-admin` — ClusterIP on port 80 → 8081
+- `store-admin` — LoadBalancer on port 80 → 8081
 
 ### Storage
 - `mongodb-data-pvc` — PersistentVolumeClaim using `managed-csi` StorageClass (Azure Managed Disk)

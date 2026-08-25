@@ -20,8 +20,10 @@ echo "║                                                                       
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Check Azure login status
-if az account show &>/dev/null; then
+# Check Azure CLI and login status
+if ! command -v az &>/dev/null; then
+    echo "⚠️  Azure CLI: Not installed in this container. Rebuild the dev container to apply the azure-cli feature."
+elif az account show &>/dev/null; then
     ACCOUNT=$(az account show --query 'name' -o tsv)
     USER=$(az account show --query 'user.name' -o tsv)
     echo "✅ Azure: Logged in as $USER ($ACCOUNT)"

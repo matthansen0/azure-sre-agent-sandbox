@@ -82,15 +82,17 @@ You should see all pods in `Running` status with `1/1` ready:
 ```
 NAME                                READY   STATUS    RESTARTS   AGE
 mongodb-7f5f5c5d4-xxxxx            1/1     Running   0          5m
-order-service-6d8f7b9c5-xxxxx      1/1     Running   0          5m
 makeline-service-5f4d6e8b7-xxxxx   1/1     Running   0          5m
 product-service-4c3d5f7a6-xxxxx    1/1     Running   0          5m
 rabbitmq-3b2c4d6e5-xxxxx           1/1     Running   0          5m
 store-admin-2a1b3c5d4-xxxxx        1/1     Running   0          5m
 store-front-1z0a2b4c3-xxxxx        1/1     Running   0          5m
 virtual-customer-9x8w7v6u-xxxxx    1/1     Running   0          5m
-virtual-worker-8w7v6u5t-xxxxx      1/1     Running   0          5m
 ```
+
+**Known Limitations:**
+- `order-service` is intentionally disabled (0 replicas) due to RabbitMQ AMQP protocol version mismatch with the application image (v2.2.0). See [BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md#known-issues) for details.
+- `virtual-worker` is also disabled (0 replicas) by design to keep demo costs low.
 
 > **Tip:** If any pods aren't ready yet, wait a minute and run `kgp` again. The first pull of container images can take a moment.
 
@@ -123,7 +125,7 @@ The application is a multi-service e-commerce platform:
 | **makeline-service** | Go | Fulfills orders from queue, writes to MongoDB |
 | **ai-service** | Python | AI product recommendations |
 | **virtual-customer** | Simulated | Generates load by placing orders |
-| **virtual-worker** | Simulated | Processes queued orders |
+| **virtual-worker** | Simulated (disabled) | Optional order processor; disabled because of the RabbitMQ protocol mismatch |
 | **RabbitMQ** | — | Message queue between order and makeline |
 | **MongoDB** | — | Persistent order storage |
 

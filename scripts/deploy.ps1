@@ -24,6 +24,9 @@
 .PARAMETER WhatIf
     Show what would be deployed without making changes
 
+.PARAMETER EnableAutomation
+    Enable Azure Monitor alerts and the default action group for incident demos
+
 .EXAMPLE
     .\deploy.ps1 -Location eastus2
 
@@ -55,10 +58,14 @@ param(
     [switch]$WhatIf,
 
     [Parameter()]
+    [switch]$EnableAutomation,
+
+    [Parameter()]
     [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
+$deploymentReady = $true
 
 function Invoke-AzCliJson {
     [CmdletBinding()]
@@ -456,6 +463,8 @@ Write-Host "  ✅ Subscription context is valid for ARM deployments" -Foreground
 Write-Host "  📋 Subscription: $($account.name) ($($account.id))" -ForegroundColor Green
 
 $deploySreAgent = -not $SkipSreAgent
+$deployAlertsValue = if ($EnableAutomation) { 'true' } else { 'false' }
+$deployActionGroupValue = if ($EnableAutomation) { 'true' } else { 'false' }
 $sreAgentSkipReason = ''
 
 if ($deploySreAgent) {
@@ -523,7 +532,7 @@ if ($WhatIf) {
     $whatIfOutput = az deployment sub what-if `
         --location $Location `
         --template-file $bicepFile `
-        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue `
+        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue deployAlerts=$deployAlertsValue deployActionGroup=$deployActionGroupValue `
         --name $deploymentName 2>&1 | Out-String
 
     if ($LASTEXITCODE -ne 0) {
@@ -551,7 +560,7 @@ try {
         "az deployment sub create",
         "--location $Location",
         "--template-file `"$bicepFile`"",
-        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue",
+        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue deployAlerts=$deployAlertsValue deployActionGroup=$deployActionGroupValue",
         "--name $deploymentName",
         "--only-show-errors",
         "--output json"
@@ -718,6 +727,7 @@ if (Test-Path $k8sPath) {
     foreach ($deploymentName in $deploymentNames) {
         kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s 2>$null
         if ($LASTEXITCODE -ne 0) {
+            $deploymentReady = $false
             Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
         }
     }
@@ -741,10 +751,12 @@ if (Test-Path $k8sPath) {
         Write-Host "  ✅ Store Front URL: $storeUrl" -ForegroundColor Green
     }
     else {
+        $deploymentReady = $false
         Write-Host "  ⚠️  Store Front external IP is still pending. Check again with: kubectl get svc store-front -n pets" -ForegroundColor Yellow
     }
 }
 else {
+    $deploymentReady = $false
     Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
 }
 
@@ -755,10 +767,12 @@ $validateScript = Join-Path $PSScriptRoot "validate-deployment.ps1"
 if (Test-Path $validateScript) {
     & pwsh -NoLogo -NoProfile -File $validateScript -ResourceGroupName $resourceGroupName
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  ⚠️  Validation found issues, but the infrastructure deployment completed. Review the validation output above." -ForegroundColor Yellow
+        $deploymentReady = $false
+        Write-Host "  ⚠️  Validation found issues. Review the validation output above before using the lab." -ForegroundColor Yellow
     }
 }
 else {
+    $deploymentReady = $false
     Write-Host "  ⚠️  Validation script not found, skipping..." -ForegroundColor Yellow
 }
 
@@ -773,15 +787,18 @@ if ($outputs.sreAgentId.value) {
     $configureScript = Join-Path $PSScriptRoot "configure-sre-agent.ps1"
     if (Test-Path $configureScript) {
         try {
-            & $configureScript -ResourceGroupName $resourceGroupName
+            $configureProfile = if ($EnableAutomation) { 'automation' } else { 'core' }
+            & $configureScript -ResourceGroupName $resourceGroupName -Profile $configureProfile
             Write-Host "  ✅ SRE Agent configuration complete" -ForegroundColor Green
         }
         catch {
+            $deploymentReady = $false
             Write-Host "  ⚠️  SRE Agent configuration had issues: $_" -ForegroundColor Yellow
             Write-Host "      You can re-run it separately: .\scripts\configure-sre-agent.ps1 -ResourceGroupName $resourceGroupName" -ForegroundColor Gray
         }
     }
     else {
+        $deploymentReady = $false
         Write-Host "  ⚠️  Configuration script not found. Run configure-sre-agent.ps1 manually." -ForegroundColor Yellow
     }
 }
@@ -793,7 +810,7 @@ $siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc store-fro
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                         Deployment Complete! 🎉                              ║
+║                    $(if ($deploymentReady) { 'Deployment Complete! 🎉' } else { 'Deployment Needs Attention' })                     ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Resources Deployed:                                                         ║
 ║    • AKS Cluster:    $($aksName.PadRight(44))║
@@ -811,4 +828,11 @@ Write-Host @"
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
+
+if (-not $deploymentReady) {
+    Write-Host "`n⚠️  Note: order-service has RabbitMQ protocol compatibility issues (see docs/LAB-GUIDE.md)" -ForegroundColor Yellow
+    Write-Host "           The lab is functional for SRE Agent demos with other services." -ForegroundColor Gray
+}
+
+exit 0
 

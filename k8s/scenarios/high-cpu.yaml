@@ -38,7 +38,7 @@ spec:
         nodepool-type: user
       containers:
         - name: stress
-          image: mcr.microsoft.com/mirror/docker/library/alpine:latest
+          image: mcr.microsoft.com/mirror/docker/library/alpine:3.20.3
           # BREAKING: Infinite CPU-intensive loop
           command: ["/bin/sh"]
           args:

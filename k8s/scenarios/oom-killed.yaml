@@ -49,7 +49,7 @@ spec:
         nodepool-type: user
       containers:
         - name: order-service
-          image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+          image: ghcr.io/azure-samples/aks-store-demo/order-service:2.2.0
           ports:
             - containerPort: 3000
           # BREAKING CHANGE: Memory limit is way too low

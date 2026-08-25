@@ -1,0 +1,54 @@
+version: 1
+description: Expected core SRE Agent sandbox state. Optional profiles extend this contract.
+profile: core
+
+azure:
+  regions:
+    - eastus2
+    - swedencentral
+    - australiaeast
+  resources:
+    - Microsoft.ContainerService/managedClusters
+    - Microsoft.OperationalInsights/workspaces
+    - Microsoft.Insights/components
+    - Microsoft.App/agents
+
+kubernetes:
+  namespace: pets
+  deployments:
+    - rabbitmq
+    - mongodb
+    - product-service
+    - order-service
+    - makeline-service
+    - store-front
+    - store-admin
+    - virtual-customer
+  intentionallyDisabledDeployments:
+    - virtual-worker
+  services:
+    - rabbitmq
+    - mongodb
+    - product-service
+    - order-service
+    - makeline-service
+    - store-front
+    - store-admin
+
+sreAgent:
+  accessLevel: High
+  actionMode: Review
+  requiredAgents:
+    - incident-handler
+    - cluster-health-monitor
+  requiredConnectors:
+    - azure-monitor
+  requiredKnowledgeFiles:
+    - aks-pod-failures.md
+    - app-architecture.md
+    - dependency-failures.md
+    - network-connectivity.md
+    - resource-exhaustion.md
+  manualSteps:
+    - incident-response-plan
+    - outlook-authorization

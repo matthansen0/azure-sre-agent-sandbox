@@ -35,6 +35,10 @@
 .PARAMETER SkipScheduledTasks
     Skip scheduled task creation.
 
+.PARAMETER Profile
+    Capability profile to configure. Core configures diagnosis; automation
+    also configures scheduled health checks.
+
 .EXAMPLE
     .\configure-sre-agent.ps1 -ResourceGroupName "rg-srelab-eastus2"
 
@@ -63,7 +67,11 @@ param(
     [switch]$SkipConnectors,
 
     [Parameter()]
-    [switch]$SkipScheduledTasks
+    [switch]$SkipScheduledTasks,
+
+    [Parameter()]
+    [ValidateSet('core', 'automation', 'developer', 'learn', 'communications')]
+    [string]$Profile = 'core'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,6 +88,18 @@ Write-Host @"
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
+
+$configurationFailures = [System.Collections.Generic.List[string]]::new()
+$automationEnabled = $Profile -eq 'automation'
+$developerEnabled = $Profile -eq 'developer' -or -not [string]::IsNullOrWhiteSpace($GitHubPat)
+$learnEnabled = $Profile -eq 'learn'
+$communicationsEnabled = $Profile -eq 'communications'
+
+function Add-ConfigurationFailure {
+    param([string]$Message)
+    $configurationFailures.Add($Message)
+    Write-Host "    ❌ $Message" -ForegroundColor Red
+}
 
 # ============================================================================
 # Discover SRE Agent
@@ -201,10 +221,12 @@ if (-not $SkipKnowledgeBase) {
                     Write-Host "    ✅ Uploaded $($file.Name)" -ForegroundColor Green
                 }
                 else {
+                    Add-ConfigurationFailure "Knowledge base upload returned HTTP $httpCode for $($file.Name)"
                     Write-Host "    ⚠️  HTTP $httpCode for $($file.Name)" -ForegroundColor Yellow
                 }
             }
             catch {
+                Add-ConfigurationFailure "Knowledge base upload failed for $($file.Name)"
                 Write-Host "    ⚠️  Failed to upload $($file.Name): $_" -ForegroundColor Yellow
             }
         }
@@ -233,7 +255,7 @@ else {
 if (-not $SkipAgents) {
     Write-Host "`n🤖 Step 2: Creating custom agents via dataplane v2 API..." -ForegroundColor Yellow
 
-    $hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat)
+    $hasGitHub = $developerEnabled
     $token = Get-SreAgentToken
 
     # Check for Python + PyYAML
@@ -245,14 +267,16 @@ if (-not $SkipAgents) {
     $agentsDir = Join-Path $PSScriptRoot "..\sre-config\agents"
 
     if (-not $python) {
+        Add-ConfigurationFailure 'Python is required to create custom agents'
         Write-Host "  ⚠️  Python not found. Skipping agent creation." -ForegroundColor Yellow
     }
     elseif (-not (Test-Path $converterScript)) {
+        Add-ConfigurationFailure "Agent converter script not found: $converterScript"
         Write-Host "  ⚠️  Converter script not found: $converterScript" -ForegroundColor Yellow
     }
     else {
         # Test that pyyaml is available
-        $yamlCheck = & $python -c "import yaml" 2>&1
+        & $python -c "import yaml" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  📦 Installing pyyaml..." -ForegroundColor Gray
             & $python -m pip install --user pyyaml 2>$null
@@ -277,6 +301,7 @@ if (-not $SkipAgents) {
 
         foreach ($yamlFile in $agentFiles) {
             if (-not (Test-Path $yamlFile)) {
+                Add-ConfigurationFailure "Agent file not found: $(Split-Path $yamlFile -Leaf)"
                 Write-Host "  ⚠️  Agent file not found: $(Split-Path $yamlFile -Leaf)" -ForegroundColor Yellow
                 continue
             }
@@ -289,6 +314,7 @@ if (-not $SkipAgents) {
             $jsonBody = & $python @convertArgs 2>&1
 
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($jsonBody)) {
+                Add-ConfigurationFailure "YAML conversion failed for $agentFileName"
                 Write-Host "  ⚠️  YAML conversion failed for $agentFileName" -ForegroundColor Yellow
                 continue
             }
@@ -316,6 +342,7 @@ if (-not $SkipAgents) {
                 $createdAgents += $customAgentName
             }
             else {
+                Add-ConfigurationFailure "Custom agent $customAgentName returned HTTP $($resp.StatusCode)"
                 Write-Host "    ⚠️  HTTP $($resp.StatusCode) for $customAgentName" -ForegroundColor Yellow
                 if ($resp.Body.Length -gt 0) {
                     try {
@@ -352,7 +379,7 @@ if (-not $SkipConnectors) {
     Write-Host "`n🔌 Step 3: Creating connectors..." -ForegroundColor Yellow
 
     $token = Get-SreAgentToken
-    $hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat)
+    $hasGitHub = $developerEnabled
 
     # 3a: Azure Monitor connector (always)
     Write-Host "  📊 Creating Azure Monitor connector..." -ForegroundColor Gray
@@ -375,10 +402,43 @@ if (-not $SkipConnectors) {
         Write-Host "    ✅ Azure Monitor connector created" -ForegroundColor Green
     }
     else {
+        Add-ConfigurationFailure "Azure Monitor connector returned HTTP $($resp.StatusCode)"
         Write-Host "    ⚠️  HTTP $($resp.StatusCode) — Azure Monitor connector may need manual setup" -ForegroundColor Yellow
     }
 
-    # 3b: GitHub MCP connector (optional)
+    # 3b: Microsoft Learn MCP connector (optional learn profile)
+    if ($learnEnabled) {
+        Write-Host "  📚 Creating Microsoft Learn MCP connector..." -ForegroundColor Gray
+
+        $learnBody = @{
+            name       = "microsoft-learn"
+            properties = @{
+                dataConnectorType  = "StreamableHttp"
+                dataSource         = "microsoft-learn"
+                serverUri          = "https://learn.microsoft.com/api/mcp"
+                authenticationType = "None"
+            }
+        } | ConvertTo-Json -Depth 5 -Compress
+
+        $resp = Invoke-DataplaneApi `
+            -Method PUT `
+            -Path "/api/v2/extendedAgent/connectors/microsoft-learn" `
+            -Body $learnBody `
+            -Token $token
+
+        if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 202) {
+            Write-Host "    ✅ Microsoft Learn connector created" -ForegroundColor Green
+        }
+        else {
+            Add-ConfigurationFailure "Microsoft Learn connector returned HTTP $($resp.StatusCode)"
+            Write-Host "    ⚠️  HTTP $($resp.StatusCode) — Microsoft Learn connector may need manual setup" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "  📚 Microsoft Learn connector — ⏭️  Skipped (learn profile not enabled)" -ForegroundColor Gray
+    }
+
+    # 3c: GitHub MCP connector (optional)
     if ($hasGitHub) {
         Write-Host "  🔗 Creating GitHub MCP connector..." -ForegroundColor Gray
 
@@ -405,6 +465,7 @@ if (-not $SkipConnectors) {
             Write-Host "    ✅ GitHub MCP connector created" -ForegroundColor Green
         }
         else {
+            Add-ConfigurationFailure "GitHub connector returned HTTP $($resp.StatusCode)"
             Write-Host "    ⚠️  HTTP $($resp.StatusCode) — GitHub connector may need manual setup in portal" -ForegroundColor Yellow
             Write-Host "       Use the pre-configured GitHub card in Settings > Connectors" -ForegroundColor Gray
         }
@@ -413,7 +474,8 @@ if (-not $SkipConnectors) {
         Write-Host "  🔗 GitHub connector — ⏭️  Skipped (no PAT provided)" -ForegroundColor Gray
     }
 
-    # 3c: Outlook connector (always — enables SendOutlookEmail tool)
+    # 3d: Outlook connector (optional communications profile)
+    if ($communicationsEnabled) {
     Write-Host "  📧 Creating Outlook connector..." -ForegroundColor Gray
 
     $outlookBody = @{
@@ -435,8 +497,13 @@ if (-not $SkipConnectors) {
         Write-Host "    📌 Authorize in portal: https://sre.azure.com → Settings → Connectors → Outlook → Authorize" -ForegroundColor Gray
     }
     else {
+        Add-ConfigurationFailure "Outlook connector returned HTTP $($resp.StatusCode)"
         Write-Host "    ⚠️  HTTP $($resp.StatusCode) — Outlook connector may need manual setup" -ForegroundColor Yellow
         Write-Host "       Create it in the portal: Settings → Connectors → Add → Outlook" -ForegroundColor Gray
+    }
+    }
+    else {
+        Write-Host "  📧 Outlook connector — ⏭️  Skipped (communications profile not enabled)" -ForegroundColor Gray
     }
 }
 else {
@@ -473,13 +540,14 @@ if ($listResp.StatusCode -eq 200) {
     }
 }
 else {
+    Add-ConfigurationFailure "Incident filter status check returned HTTP $($listResp.StatusCode)"
     Write-Host "  ⚠️  HTTP $($listResp.StatusCode) — could not check incident filters" -ForegroundColor Yellow
 }
 
 # ============================================================================
 # Step 5: Create Scheduled Tasks
 # ============================================================================
-if (-not $SkipScheduledTasks) {
+if (-not $SkipScheduledTasks -and $automationEnabled) {
     Write-Host "`n⏰ Step 5: Creating scheduled health check..." -ForegroundColor Yellow
 
     $token = Get-SreAgentToken
@@ -505,17 +573,18 @@ if (-not $SkipScheduledTasks) {
         Write-Host "  ✅ Scheduled task 'daily-health-check' created (runs daily at 08:00 UTC)" -ForegroundColor Green
     }
     else {
+        Add-ConfigurationFailure "Scheduled task returned HTTP $($resp.StatusCode)"
         Write-Host "  ⚠️  HTTP $($resp.StatusCode) — scheduled task creation failed" -ForegroundColor Yellow
     }
 }
 else {
-    Write-Host "`n⏰ Step 5: Skipping scheduled tasks (-SkipScheduledTasks)" -ForegroundColor Gray
+    Write-Host "`n⏰ Step 5: Skipping scheduled tasks (automation profile not enabled)" -ForegroundColor Gray
 }
 
 # ============================================================================
 # Step 6: Summary and Portal Guidance
 # ============================================================================
-$hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat)
+$hasGitHub = $developerEnabled
 
 Write-Host @"
 
@@ -525,8 +594,10 @@ Write-Host @"
 ║  ✅ Knowledge Base: Runbooks uploaded to Agent Memory                        ║
 ║  ✅ Custom Agents:  incident-handler, cluster-health-monitor                 ║
 $(if ($hasGitHub) { "║  ✅ Custom Agents:  code-analyzer (GitHub enabled)                         ║`n" } else { "" })║  ✅ Connector:      Azure Monitor (incident source)                          ║
-║  ✅ Connector:      Outlook (email delivery — authorize in portal)           ║
-$(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis)                      ║`n" } else { "" })║  ✅ Scheduled Task: daily-health-check (08:00 UTC)                           ║
+$(if ($learnEnabled) { "║  ✅ Connector:      Microsoft Learn MCP (documentation lookup)              ║`n" } else { "" })
+$(if ($communicationsEnabled) { "║  ✅ Connector:      Outlook (email delivery — authorize in portal)           ║`n" } else { "" })
+$(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis)                      ║`n" } else { "" })
+$(if ($automationEnabled) { "║  ✅ Scheduled Task: daily-health-check (08:00 UTC)                         ║`n" } else { "" })
 ║                                                                              ║
 ║  Portal: https://sre.azure.com                                               ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -534,6 +605,7 @@ $(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis) 
 "@ -ForegroundColor Cyan
 
 # Outlook authorization reminder
+if ($communicationsEnabled) {
 Write-Host "📧 Outlook Authorization (required for email delivery):" -ForegroundColor Yellow
 Write-Host "   The Outlook connector was created but must be authorized in the portal:" -ForegroundColor Gray
 Write-Host ""
@@ -542,6 +614,7 @@ Write-Host "   2. Find the Outlook connector and click 'Authorize'" -ForegroundC
 Write-Host "   3. Sign in with the account that should send incident emails" -ForegroundColor White
 Write-Host "   4. Once authorized, agents can use SendOutlookEmail to deliver results" -ForegroundColor White
 Write-Host ""
+}
 
 # Incident response plan guidance
 Write-Host "📋 Incident Response Plan (portal only — API is read-only):" -ForegroundColor Yellow
@@ -566,3 +639,11 @@ Write-Host "  4. Apply a breakable scenario: break-oom, break-crash, etc." -Fore
 Write-Host "  5. Ask the agent: 'Why are pods crashing in the pets namespace?'" -ForegroundColor White
 Write-Host "  6. Or invoke directly: /agent incident-handler" -ForegroundColor White
 Write-Host ""
+
+if ($configurationFailures.Count -gt 0) {
+    Write-Host "Configuration completed with $($configurationFailures.Count) failure(s):" -ForegroundColor Red
+    foreach ($failure in $configurationFailures) {
+        Write-Host "  - $failure" -ForegroundColor Red
+    }
+    exit 1
+}

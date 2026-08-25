@@ -1,0 +1,69 @@
+name: Offline validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Validate scenario and image policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          scenario_count=$(find k8s/scenarios -maxdepth 1 -name '*.yaml' | wc -l)
+          readme_claim=$(grep -Eo '[0-9]+ breakable scenarios' README.md | head -1 | awk '{print $1}')
+          if [[ "$scenario_count" != "$readme_claim" ]]; then
+            echo "README claims $readme_claim scenarios, found $scenario_count"
+            exit 1
+          fi
+          if grep -E '^[[:space:]]*image:.*:latest([[:space:]]*)$' k8s/base/application.yaml; then
+            echo 'Mutable :latest image found in the baseline manifest.'
+            exit 1
+          fi
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem scripts -Filter '*.ps1'
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | Format-List
+              throw "PowerShell parse failed: $($file.Name)"
+            }
+          }
+
+      - name: Validate YAML syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --quiet pyyaml
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          for path in list(Path('k8s').rglob('*.yaml')) + list(Path('sre-config').rglob('*.yaml')):
+              with path.open() as stream:
+                  list(yaml.safe_load_all(stream))
+              print(f'validated {path}')
+          PY
+
+      - name: Build Bicep templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          az bicep build --file infra/bicep/main.bicep --stdout >/dev/null

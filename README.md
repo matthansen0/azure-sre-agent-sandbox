@@ -5,7 +5,7 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 ## 🎯 What This Lab Provides
 
 - **Azure Kubernetes Service (AKS)** with a multi-pod e-commerce demo application
-- **8 breakable scenarios** for demonstrating SRE Agent diagnosis
+- **10 breakable scenarios** for demonstrating SRE Agent diagnosis
 - **Azure SRE Agent** deployed automatically via Bicep for AI-powered diagnostics
 - **SRE Agent configuration layer**: Knowledge base runbooks, custom agents, connectors, and scheduled tasks
 - **Full observability stack**: Log Analytics, Application Insights, Managed Grafana
@@ -31,6 +31,13 @@ az login --use-device-code
 
 # 2. Deploy infrastructure (~15-25 minutes)
 .\scripts\deploy.ps1 -Location eastus2 -Yes
+```
+
+To include Azure Monitor alerts and the default action group for an incident
+automation walkthrough:
+
+```powershell
+.\scripts\deploy.ps1 -Location eastus2 -EnableAutomation -Yes
 ```
 
 > 💡 **Tip**: Type `menu` in the terminal to see all available commands including break scenarios, fix commands, and kubectl shortcuts.
@@ -135,6 +142,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)
+- `-EnableAutomation`: Enable Azure Monitor alerts and the default action group
 
 ### Kubernetes Commands (kubectl)
 

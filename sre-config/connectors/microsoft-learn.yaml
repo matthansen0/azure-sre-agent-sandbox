@@ -1,0 +1,11 @@
+# Microsoft Learn MCP Connector — optional profile
+# Endpoint: https://learn.microsoft.com/api/mcp
+# Configure this connector only when the learn profile is enabled.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: microsoft-learn
+  dataConnectorType: StreamableHttp
+  dataSource: microsoft-learn
+  serverUri: https://learn.microsoft.com/api/mcp
+  authenticationType: None
