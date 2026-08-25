@@ -68,11 +68,14 @@ Write-Host @"
 
 $totalChecks = 0
 $passedChecks = 0
+# order-service is intentionally scaled to 0 replicas due to a RabbitMQ AMQP
+# protocol incompatibility (see docs/LAB-GUIDE.md) and is excluded from the
+# required readiness checks below.
+$disabledDeployments = @('order-service')
 $requiredDeployments = @(
     'rabbitmq'
     'mongodb'
     'product-service'
-    'order-service'
     'makeline-service'
     'store-front'
     'store-admin'
@@ -272,7 +275,12 @@ foreach ($svc in $services.items) {
     $readyEndpointCount = @($endpointSlices.items | ForEach-Object { $_.endpoints } | Where-Object {
             $_.addresses.Count -gt 0 -and $_.conditions.ready -ne $false
         }).Count
-    
+
+    if ($svcName -in $disabledDeployments) {
+        Write-Host "  ℹ️  $svcName ($svcType) - intentionally disabled (0 replicas), skipping endpoint check" -ForegroundColor Gray
+        continue
+    }
+
     if ($svcType -eq "LoadBalancer") {
         $externalIP = $null
         if ($svc.status.loadBalancer.ingress -and $svc.status.loadBalancer.ingress.Count -gt 0) {
