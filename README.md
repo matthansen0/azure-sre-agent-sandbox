@@ -85,6 +85,8 @@ After deployment, `deploy.ps1` automatically configures the SRE Agent with:
    - "Run a health check on my cluster"
    - "Trace the dependency chain — what broke first?"
 
+> ⚠️ **Manual step required:** Automated deployment cannot create an Incident Response Plan — the SRE Agent API for this is portal-only. See the [Manual Portal Steps Checklist](docs/SRE-AGENT-SETUP.md#-manual-portal-steps-checklist) for this and other one-time portal steps.
+
 ### Adding GitHub Integration
 
 To enable source code analysis and automated issue creation:

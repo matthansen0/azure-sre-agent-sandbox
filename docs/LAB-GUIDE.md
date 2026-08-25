@@ -172,6 +172,8 @@ In the SRE Agent portal, check:
 - **Knowledge Files** — runbooks for pod failures, networking, dependencies, etc.
 - **Connectors** — Azure Monitor (and optionally Outlook, GitHub)
 
+> ⚠️ **Before you break anything:** agents won't auto-trigger on incidents until you create an **Incident Response Plan** — this step can't be automated and must be done in the portal. See the [Manual Portal Steps Checklist](SRE-AGENT-SETUP.md#-manual-portal-steps-checklist) before starting Lab 1.
+
 ---
 
 ## Lab 1: OOMKilled — The Classic Pod Crash
@@ -429,7 +431,7 @@ The agents are configured to send reports with a subject line like:
 
 The body includes root cause analysis, affected resources, evidence collected, and recommended remediation steps.
 
-> **Note:** The incident response plan must be created manually in the [SRE Agent portal](https://sre.azure.com). See [SRE-AGENT-SETUP.md](SRE-AGENT-SETUP.md#post-configuration-create-incident-response-plan) for instructions.
+> **Note:** The incident response plan must be created manually in the [SRE Agent portal](https://sre.azure.com). See the [Manual Portal Steps Checklist](SRE-AGENT-SETUP.md#-manual-portal-steps-checklist) for this and other one-time portal steps.
 
 ---
 

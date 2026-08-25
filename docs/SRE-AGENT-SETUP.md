@@ -249,6 +249,22 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 
 > **Note:** Incident response plans must be created manually in the [SRE Agent portal](https://sre.azure.com) — the script prints guidance for this.
 
+## ✅ Manual Portal Steps Checklist
+
+The dataplane v2 API cannot configure everything — the items below **must** be done in the [SRE Agent portal](https://sre.azure.com) regardless of how you ran `configure-sre-agent.ps1`. Bookmark this checklist for every new deployment.
+
+| # | Step | Required? | Where |
+|---|------|-----------|-------|
+| 1 | [Create an Incident Response Plan](#post-configuration-create-incident-response-plan) so agents auto-trigger on real incidents | **Always** — without it, agents only respond to manual chat prompts | Builder → Incident response plans |
+| 2 | [Authorize the Outlook connector](#post-configuration-authorize-outlook) | Only if using the `communications` profile (email reports) | Settings → Connectors → Outlook |
+| 3 | Verify the agent's managed identity / RBAC assignments appear under **Settings → Managed resources** | Recommended sanity check after deployment | Settings → Managed resources |
+| 4 | Review **Builder → Agent Canvas** to confirm `incident-handler` and `cluster-health-monitor` (and `code-analyzer` if GitHub is enabled) show up with the correct tools attached | Recommended sanity check | Builder → Agent Canvas |
+| 5 | Review **Knowledge Files** to confirm all 6 runbooks from `sre-config/knowledge-base/` were indexed | Recommended sanity check | Builder → Knowledge Files |
+| 6 | If using the `automation` profile, confirm the Azure Monitor connector shows a **Connected** status | Only if `-EnableAutomation` / `automation` profile was used | Settings → Connectors → Azure Monitor |
+
+Steps 1 and 2 are the only ones that are **impossible to automate** via the API today (the `incidentFilters` and OAuth-based connector endpoints are portal-only). Steps 3–6 are just verification and can be skipped if `configure-sre-agent.ps1` reported success for those components.
+
+
 ### Post-Configuration: Authorize Outlook
 
 The Outlook connector enables the `SendOutlookEmail` tool so agents can email you incident analysis and health reports. After the script runs:
