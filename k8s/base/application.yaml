@@ -53,7 +53,7 @@ spec:
         nodepool-type: user
       containers:
         - name: rabbitmq
-          image: rabbitmq:3.11-management-alpine
+          image: rabbitmq:4.3.5-management-alpine
           ports:
             - containerPort: 5672
               name: amqp
@@ -567,7 +567,7 @@ spec:
 
 ---
 # =============================================================================
-# Virtual Worker - Order processor simulator (disabled by default due to AMQP compatibility)
+# Virtual Worker - Order processor simulator (disabled by default)
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -577,7 +577,7 @@ metadata:
   labels:
     app: virtual-worker
 spec:
-  replicas: 0 # Disabled: AMQP protocol mismatch with RabbitMQ 3.11
+  replicas: 0
   selector:
     matchLabels:
       app: virtual-worker
