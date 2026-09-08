@@ -35,6 +35,10 @@ az login --use-device-code
 .\scripts\deploy.ps1 -Location eastus2 -Yes
 ```
 
+To opt into the Azure Monitor automation profile, add
+`-EnableAzureMonitorAutomation`. The core deployment leaves alert rules and the
+default action group disabled.
+
 > 💡 **Tip**: Type `menu` in the terminal to see all available commands including break scenarios, fix commands, and kubectl shortcuts.
 
 ## 💥 Breaking Things (The Fun Part!)
@@ -135,6 +139,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
+- `-EnableAzureMonitorAutomation`: Deploy Azure Monitor alerts and the default action group (disabled by default)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)
 

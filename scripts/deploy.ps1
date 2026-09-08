@@ -52,6 +52,9 @@ param(
     [switch]$SkipSreAgent,
 
     [Parameter()]
+    [switch]$EnableAzureMonitorAutomation,
+
+    [Parameter()]
     [switch]$WhatIf,
 
     [Parameter()]
@@ -485,6 +488,8 @@ else {
 }
 
 $deploySreAgentValue = if ($deploySreAgent) { 'true' } else { 'false' }
+$deployAlertsValue = if ($EnableAzureMonitorAutomation) { 'true' } else { 'false' }
+$deployActionGroupValue = if ($EnableAzureMonitorAutomation) { 'true' } else { 'false' }
 
 # Confirm subscription
 Write-Host "`n⚠️  Resources will be deployed to subscription: $($account.name)" -ForegroundColor Yellow
@@ -511,6 +516,7 @@ Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Azure Monitor:   $(if ($EnableAzureMonitorAutomation) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
 }
@@ -523,7 +529,7 @@ if ($WhatIf) {
     $whatIfOutput = az deployment sub what-if `
         --location $Location `
         --template-file $bicepFile `
-        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue `
+        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue deployAlerts=$deployAlertsValue deployActionGroup=$deployActionGroupValue `
         --name $deploymentName 2>&1 | Out-String
 
     if ($LASTEXITCODE -ne 0) {
@@ -551,7 +557,7 @@ try {
         "az deployment sub create",
         "--location $Location",
         "--template-file `"$bicepFile`"",
-        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue",
+        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue deployAlerts=$deployAlertsValue deployActionGroup=$deployActionGroupValue",
         "--name $deploymentName",
         "--only-show-errors",
         "--output json"
@@ -789,7 +795,11 @@ if ($outputs.sreAgentId.value) {
             if (-not (Test-Path $verifyScript)) {
                 throw "SRE Agent verifier not found at $verifyScript"
             }
-            & $verifyScript -ResourceGroupName $resourceGroupName
+            $verifyParams = @{ ResourceGroupName = $resourceGroupName }
+            if ($EnableAzureMonitorAutomation) {
+                $verifyParams.RequireAzureMonitorAutomation = $true
+            }
+            & $verifyScript @verifyParams
             if ($LASTEXITCODE -ne 0) {
                 throw "SRE Agent configuration verification returned exit code $LASTEXITCODE"
             }

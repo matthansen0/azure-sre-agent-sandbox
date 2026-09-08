@@ -234,6 +234,20 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
     -GitHubRepo "owner/repo"
 ```
 
+### Optional Azure Monitor Automation Profile
+
+The core deployment does not create alert rules or an action group. Enable the
+profile explicitly when testing alert-driven workflows:
+
+```powershell
+.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
+```
+
+This deploys four symptom-focused alerts and the `ag-srelab` action group. The
+deployment verifier requires those resources only when the profile is enabled.
+Review-mode remediation and incident response plans remain separate controls;
+incident-filter creation is still subject to the compatibility probe below.
+
 ### What Gets Configured
 
 | Component | Description |
@@ -247,7 +261,7 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
 
-> **Note:** Incident response plans must be created manually in the [SRE Agent portal](https://sre.azure.com) — the script prints guidance for this.
+> **Note:** The configuration script only reads incident-filter state. Creation support is probed separately because the service has not published a stable dataplane request schema.
 
 ### Post-Configuration: Authorize Outlook
 
@@ -260,7 +274,19 @@ The Outlook connector enables the `SendOutlookEmail` tool so agents can email yo
 
 ### Post-Configuration: Create Incident Response Plan
 
-Incident response plans **cannot** be created via the dataplane API — the `incidentFilters` endpoint is read-only. Create one in the portal:
+Until the compatibility probe succeeds for the deployed service, treat incident response plan creation as portal-only. Do not put credentials or unreviewed payloads in the repository.
+
+To run the isolated create/read/delete probe, provide a locally reviewed JSON payload:
+
+```powershell
+.\scripts\probe-incident-filter-api.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -PayloadPath .\incident-filter-payload.json
+```
+
+The probe uses a temporary name, prints only status codes and truncated response bodies, and deletes the test filter only after a successful create. Exit code `2` means creation is still unsupported; exit code `1` means the probe itself could not run or cleanup failed.
+
+If the probe reports unsupported creation, create one in the portal:
 
 1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Builder** → **Incident response plans**
 2. Click **New incident response plan**

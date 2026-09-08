@@ -12,7 +12,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [string]$ResourceGroupName
+    [string]$ResourceGroupName,
+
+    [Parameter()]
+    [switch]$RequireAzureMonitorAutomation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,6 +64,31 @@ if ([string]::IsNullOrWhiteSpace($agentEndpoint)) {
 $token = az account get-access-token --resource https://azuresre.dev --query accessToken -o tsv 2>$null
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
     throw 'Could not acquire an SRE Agent dataplane access token.'
+}
+
+if ($RequireAzureMonitorAutomation) {
+    $monitorResources = @(az resource list --resource-group $ResourceGroupName --output json 2>$null | ConvertFrom-Json)
+    $requiredAlertNames = @(
+        'alert-srelab-pod-restarts',
+        'alert-srelab-http-5xx',
+        'alert-srelab-pod-failures',
+        'alert-srelab-crashloop-oom'
+    )
+    foreach ($alertName in $requiredAlertNames) {
+        if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/scheduledQueryRules' -and $_.name -eq $alertName }).Count -eq 1) {
+            Write-Host "  ✅ Azure Monitor alert/$alertName" -ForegroundColor Green
+        }
+        else {
+            Add-Failure -Component "Azure Monitor alert/$alertName" -Reason 'Expected alert resource was not found'
+        }
+    }
+
+    if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/actionGroups' -and $_.name -eq 'ag-srelab' }).Count -eq 1) {
+        Write-Host '  ✅ Azure Monitor action group/ag-srelab' -ForegroundColor Green
+    }
+    else {
+        Add-Failure -Component 'Azure Monitor action group/ag-srelab' -Reason 'Expected action group was not found'
+    }
 }
 
 $checks = @(
