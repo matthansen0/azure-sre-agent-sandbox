@@ -39,6 +39,13 @@ To opt into the Azure Monitor automation profile, add
 `-EnableAzureMonitorAutomation`. The core deployment leaves alert rules and the
 default action group disabled.
 
+Inspect or explicitly remove the enabled profile with:
+
+```powershell
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2"
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2" -Cleanup -ConfirmCleanup
+```
+
 > 💡 **Tip**: Type `menu` in the terminal to see all available commands including break scenarios, fix commands, and kubectl shortcuts.
 
 ## 💥 Breaking Things (The Fun Part!)
