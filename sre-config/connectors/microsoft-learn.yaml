@@ -1,0 +1,10 @@
+# Microsoft Learn MCP Connector - opt-in external knowledge track
+# Created by configure-sre-agent.ps1 when -EnableMicrosoftLearnMcp is provided.
+api_version: azuresre.ai/v2
+kind: DataConnector
+spec:
+  name: microsoft-learn
+  dataConnectorType: StreamableHttp
+  dataSource: microsoft-learn
+  serverUri: https://learn.microsoft.com/api/mcp
+  authenticationType: None

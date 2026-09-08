@@ -55,6 +55,9 @@ param(
     [switch]$EnableAzureMonitorAutomation,
 
     [Parameter()]
+    [switch]$EnableMicrosoftLearnMcp,
+
+    [Parameter()]
     [switch]$WhatIf,
 
     [Parameter()]
@@ -785,7 +788,11 @@ if ($outputs.sreAgentId.value) {
     $configureScript = Join-Path $PSScriptRoot "configure-sre-agent.ps1"
     if (Test-Path $configureScript) {
         try {
-            & $configureScript -ResourceGroupName $resourceGroupName
+            $configureParams = @{ ResourceGroupName = $resourceGroupName }
+            if ($EnableMicrosoftLearnMcp) {
+                $configureParams.EnableMicrosoftLearnMcp = $true
+            }
+            & $configureScript @configureParams
             if ($LASTEXITCODE -ne 0) {
                 throw "SRE Agent configuration returned exit code $LASTEXITCODE"
             }
@@ -798,6 +805,9 @@ if ($outputs.sreAgentId.value) {
             $verifyParams = @{ ResourceGroupName = $resourceGroupName }
             if ($EnableAzureMonitorAutomation) {
                 $verifyParams.RequireAzureMonitorAutomation = $true
+            }
+            if ($EnableMicrosoftLearnMcp) {
+                $verifyParams.RequireMicrosoftLearnMcp = $true
             }
             & $verifyScript @verifyParams
             if ($LASTEXITCODE -ne 0) {

@@ -234,6 +234,18 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
     -GitHubRepo "owner/repo"
 ```
 
+Microsoft Learn MCP is an independent opt-in track and requires no customer
+credentials:
+
+```powershell
+.\scripts\configure-sre-agent.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -EnableMicrosoftLearnMcp
+```
+
+The connector uses `https://learn.microsoft.com/api/mcp`. Its setup failure is
+reported when enabled, but it never blocks the core configuration when omitted.
+
 ### Optional Azure Monitor Automation Profile
 
 The core deployment does not create alert rules or an action group. Enable the

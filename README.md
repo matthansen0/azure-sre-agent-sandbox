@@ -140,6 +140,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
 - `-EnableAzureMonitorAutomation`: Deploy Azure Monitor alerts and the default action group (disabled by default)
+- `-EnableMicrosoftLearnMcp`: Enable the credential-free Microsoft Learn MCP connector (disabled by default)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)
 

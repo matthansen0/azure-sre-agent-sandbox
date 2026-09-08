@@ -15,7 +15,10 @@ param(
     [string]$ResourceGroupName,
 
     [Parameter()]
-    [switch]$RequireAzureMonitorAutomation
+    [switch]$RequireAzureMonitorAutomation,
+
+    [Parameter()]
+    [switch]$RequireMicrosoftLearnMcp
 )
 
 $ErrorActionPreference = 'Stop'
@@ -89,6 +92,19 @@ if ($RequireAzureMonitorAutomation) {
     else {
         Add-Failure -Component 'Azure Monitor action group/ag-srelab' -Reason 'Expected action group was not found'
     }
+}
+
+if ($RequireMicrosoftLearnMcp) {
+    $learnResponse = Invoke-DataplaneApi -Url "$agentEndpoint/api/v2/extendedAgent/connectors/microsoft-learn" -Token $token
+    if ($learnResponse.StatusCode -eq 200) {
+        Write-Host '  ✅ Microsoft Learn MCP connector' -ForegroundColor Green
+    }
+    else {
+        Add-Failure -Component 'Microsoft Learn MCP connector' -Reason "HTTP $($learnResponse.StatusCode)"
+    }
+}
+else {
+    Write-Host '  ℹ️  Microsoft Learn MCP connector skipped (opt-in).' -ForegroundColor Gray
 }
 
 $checks = @(
