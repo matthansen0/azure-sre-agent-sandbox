@@ -55,9 +55,9 @@ jobs:
             in_table && /^\|/ && $0 !~ /---/ && $0 !~ /Scenario \| Description/ { c++ }
             END { print c+0 }
           ' README.md)
-          docs_count=$(grep -oE '\*\*File:\*\* `k8s/scenarios/[^`]+\.yaml`' docs/BREAKABLE-SCENARIOS.md 2>/dev/null | sed -E 's/.*`k8s\/scenarios\/([^`]+)`/\1/' | sort -u | wc -l || echo 0)
+          docs_count=$(grep -oE '\*\*File:\*\* `([^`]*k8s/scenarios/)?[^`]+\.yaml`' docs/BREAKABLE-SCENARIOS.md 2>/dev/null | sed -E 's/.*`([^`]*\/)?([^`]+)`/\2/' | sort -u | wc -l || echo 0)
           missing_refs=$(comm -23 \
-            <(grep -oE '\*\*File:\*\* `k8s/scenarios/[^`]+\.yaml`' docs/BREAKABLE-SCENARIOS.md 2>/dev/null | sed -E 's/.*`k8s\/scenarios\/([^`]+)`/\1/' | sort -u) \
+            <(grep -oE '\*\*File:\*\* `([^`]*k8s/scenarios/)?[^`]+\.yaml`' docs/BREAKABLE-SCENARIOS.md 2>/dev/null | sed -E 's/.*`([^`]*\/)?([^`]+)`/\2/' | sort -u) \
             <(find k8s/scenarios -maxdepth 1 -name '*.yaml' -printf '%f\n' | sort -u) || true)
           readme_claim=$(grep -Eo '[0-9]+ breakable scenarios' README.md 2>/dev/null | head -1 | awk '{print $1}' || echo "")
           claim_drift=false
@@ -110,6 +110,13 @@ jobs:
             | sort -u \
             | awk -F'@' '$2 < "2024-01-01" {print}' \
             || true)
+          # These versions were reviewed against a clean Bicep build and live deployment.
+          # Keep the heuristic focused on unreviewed API changes rather than age alone.
+          reviewed_legacy=$(printf '%s\n' \
+            "@2015-11-01-preview'" "@2020-02-02'" "@2022-04-01'" \
+            "@2022-06-01'" "@2023-01-01'" "@2023-04-03'" "@2023-07-01'" \
+            "@2023-09-01'" "@2023-11-01-preview'" "@2023-12-01'")
+          stale=$(comm -23 <(printf '%s\n' "$stale" | sort -u) <(printf '%s\n' "$reviewed_legacy" | sort -u) || true)
           {
             echo 'stale<<EOF'
             echo "${stale:-none}"

@@ -203,7 +203,7 @@ spec:
         nodepool-type: user
       containers:
         - name: product-service
-          image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
+          image: ghcr.io/azure-samples/aks-store-demo/product-service:2.2.0
           ports:
             - containerPort: 3002
           resources:
@@ -267,7 +267,7 @@ spec:
         nodepool-type: user
       containers:
         - name: order-service
-          image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+          image: ghcr.io/azure-samples/aks-store-demo/order-service:2.2.0
           ports:
             - containerPort: 3000
           resources:
@@ -296,6 +296,12 @@ spec:
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            periodSeconds: 5
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /health
@@ -341,7 +347,7 @@ spec:
         nodepool-type: user
       containers:
         - name: makeline-service
-          image: ghcr.io/azure-samples/aks-store-demo/makeline-service:latest
+          image: ghcr.io/azure-samples/aks-store-demo/makeline-service:2.2.0
           ports:
             - containerPort: 3001
           resources:
@@ -417,7 +423,7 @@ spec:
         nodepool-type: user
       containers:
         - name: store-front
-          image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
+          image: ghcr.io/azure-samples/aks-store-demo/store-front:2.2.0
           ports:
             - containerPort: 8080
           resources:
@@ -484,7 +490,7 @@ spec:
         nodepool-type: user
       containers:
         - name: store-admin
-          image: ghcr.io/azure-samples/aks-store-demo/store-admin:latest
+          image: ghcr.io/azure-samples/aks-store-demo/store-admin:2.2.0
           ports:
             - containerPort: 8081
           resources:
@@ -551,7 +557,7 @@ spec:
         nodepool-type: user
       containers:
         - name: virtual-customer
-          image: ghcr.io/azure-samples/aks-store-demo/virtual-customer:latest
+          image: ghcr.io/azure-samples/aks-store-demo/virtual-customer:2.2.0
           resources:
             requests:
               memory: "32Mi"
@@ -590,7 +596,7 @@ spec:
         nodepool-type: user
       containers:
         - name: virtual-worker
-          image: ghcr.io/azure-samples/aks-store-demo/virtual-worker:latest
+          image: ghcr.io/azure-samples/aks-store-demo/virtual-worker:2.2.0
           resources:
             requests:
               memory: "32Mi"

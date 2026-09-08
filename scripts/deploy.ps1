@@ -706,7 +706,10 @@ $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
 if (Test-Path $k8sPath) {
     kubectl apply -f $k8sPath
-    Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to apply the demo application manifest: $k8sPath"
+    }
+    Write-Host "  ✅ Demo application manifest applied" -ForegroundColor Green
     
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
     $deploymentNamesRaw = kubectl get deployment -n pets -o jsonpath='{.items[*].metadata.name}' 2>$null
@@ -714,11 +717,14 @@ if (Test-Path $k8sPath) {
     if ($deploymentNamesRaw) {
         $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     }
+    if ($deploymentNames.Count -eq 0) {
+        throw "No deployments were found in the pets namespace after applying the demo application manifest."
+    }
 
     foreach ($deploymentName in $deploymentNames) {
         kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
+            throw "Rollout failed or timed out for deployment/$deploymentName. Check: kubectl describe deployment/$deploymentName -n pets"
         }
     }
     
@@ -755,11 +761,11 @@ $validateScript = Join-Path $PSScriptRoot "validate-deployment.ps1"
 if (Test-Path $validateScript) {
     & pwsh -NoLogo -NoProfile -File $validateScript -ResourceGroupName $resourceGroupName
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  ⚠️  Validation found issues, but the infrastructure deployment completed. Review the validation output above." -ForegroundColor Yellow
+        throw "Deployment validation failed. Review the validation output above before using the lab."
     }
 }
 else {
-    Write-Host "  ⚠️  Validation script not found, skipping..." -ForegroundColor Yellow
+    throw "Deployment validation script not found at $validateScript"
 }
 
 if ($sreAgentSkipReason -and -not $outputs.sreAgentId.value) {
@@ -774,11 +780,22 @@ if ($outputs.sreAgentId.value) {
     if (Test-Path $configureScript) {
         try {
             & $configureScript -ResourceGroupName $resourceGroupName
+            if ($LASTEXITCODE -ne 0) {
+                throw "SRE Agent configuration returned exit code $LASTEXITCODE"
+            }
             Write-Host "  ✅ SRE Agent configuration complete" -ForegroundColor Green
+
+            $verifyScript = Join-Path $PSScriptRoot "verify-sre-agent-configuration.ps1"
+            if (-not (Test-Path $verifyScript)) {
+                throw "SRE Agent verifier not found at $verifyScript"
+            }
+            & $verifyScript -ResourceGroupName $resourceGroupName
+            if ($LASTEXITCODE -ne 0) {
+                throw "SRE Agent configuration verification returned exit code $LASTEXITCODE"
+            }
         }
         catch {
-            Write-Host "  ⚠️  SRE Agent configuration had issues: $_" -ForegroundColor Yellow
-            Write-Host "      You can re-run it separately: .\scripts\configure-sre-agent.ps1 -ResourceGroupName $resourceGroupName" -ForegroundColor Gray
+            throw "SRE Agent configuration failed: $_"
         }
     }
     else {

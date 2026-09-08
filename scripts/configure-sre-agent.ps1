@@ -67,6 +67,19 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$configurationFailures = [System.Collections.Generic.List[string]]::new()
+
+function Add-ConfigurationFailure {
+    param([Parameter(Mandatory)][string]$Component, [Parameter(Mandatory)][string]$Reason)
+    $message = "${Component}: $Reason"
+    [void]$configurationFailures.Add($message)
+    Write-Host "    ❌ $message" -ForegroundColor Red
+}
+
+function Test-SuccessStatus {
+    param([int]$StatusCode)
+    return $StatusCode -ge 200 -and $StatusCode -lt 300
+}
 
 # ============================================================================
 # Banner
@@ -149,21 +162,32 @@ function Invoke-DataplaneApi {
     )
 
     $url = "$agentEndpoint$Path"
+    $attempt = 0
 
-    $curlArgs = @('-s', '-w', "`n%{http_code}", '-X', $Method, $url,
-        '-H', "Authorization: Bearer $Token")
+    do {
+        $attempt++
+        $curlArgs = @('-s', '-w', "`n%{http_code}", '-X', $Method, $url,
+                      '-H', "Authorization: Bearer $Token")
 
-    if ($Body) {
-        $curlArgs += @('-H', 'Content-Type: application/json', '-d', $Body)
-    }
+        if ($Body) {
+            $curlArgs += @('-H', 'Content-Type: application/json', '-d', $Body)
+        }
 
-    $output = & curl @curlArgs 2>&1
-    $lines = ($output -join "`n") -split "`n"
-    $httpCode = $lines[-1].Trim()
-    $responseBody = ($lines[0..($lines.Count - 2)]) -join "`n"
+        $output = & curl @curlArgs 2>&1
+        $lines = ($output -join "`n") -split "`n"
+        $httpCode = $lines[-1].Trim()
+        $responseBody = if ($lines.Count -gt 1) { ($lines[0..($lines.Count - 2)]) -join "`n" } else { '' }
+        $statusCode = 0
+        [void][int]::TryParse($httpCode, [ref]$statusCode)
+        $retryable = $statusCode -eq 0 -or $statusCode -eq 408 -or $statusCode -eq 429 -or $statusCode -ge 500
+
+        if ($retryable -and $attempt -lt 3) {
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    } while ($retryable -and $attempt -lt 3)
 
     return @{
-        StatusCode = [int]$httpCode
+        StatusCode = $statusCode
         Body       = $responseBody
     }
 }
@@ -178,7 +202,7 @@ if (-not $SkipKnowledgeBase) {
     $kbFiles = Get-ChildItem -Path $kbPath -Filter "*.md" -ErrorAction SilentlyContinue
 
     if ($kbFiles.Count -eq 0) {
-        Write-Host "  ⚠️  No knowledge base files found in $kbPath" -ForegroundColor Yellow
+        Add-ConfigurationFailure -Component 'Knowledge base' -Reason "No markdown files found in $kbPath"
     }
     else {
         $token = Get-SreAgentToken
@@ -201,11 +225,11 @@ if (-not $SkipKnowledgeBase) {
                     Write-Host "    ✅ Uploaded $($file.Name)" -ForegroundColor Green
                 }
                 else {
-                    Write-Host "    ⚠️  HTTP $httpCode for $($file.Name)" -ForegroundColor Yellow
+                    Add-ConfigurationFailure -Component "Knowledge base/$($file.Name)" -Reason "HTTP $httpCode"
                 }
             }
             catch {
-                Write-Host "    ⚠️  Failed to upload $($file.Name): $_" -ForegroundColor Yellow
+                Add-ConfigurationFailure -Component "Knowledge base/$($file.Name)" -Reason $_.Exception.Message
             }
         }
 
@@ -218,8 +242,11 @@ if (-not $SkipKnowledgeBase) {
                 Write-Host "  📊 $indexedCount files indexed in agent memory" -ForegroundColor Green
             }
             catch {
-                Write-Host "  📊 Files uploaded (could not parse count)" -ForegroundColor Gray
+                Add-ConfigurationFailure -Component 'Knowledge base verification' -Reason 'Could not parse the Agent Memory response'
             }
+        }
+        else {
+            Add-ConfigurationFailure -Component 'Knowledge base verification' -Reason "HTTP $($filesResp.StatusCode)"
         }
     }
 }
@@ -240,15 +267,16 @@ if (-not $SkipAgents) {
     $python = $null
     if (Get-Command python3 -ErrorAction SilentlyContinue) { $python = 'python3' }
     elseif (Get-Command python -ErrorAction SilentlyContinue) { $python = 'python' }
+    elseif (Test-Path '/opt/az/bin/python3') { $python = '/opt/az/bin/python3' }
 
     $converterScript = Join-Path $PSScriptRoot "yaml-to-agent-json.py"
     $agentsDir = Join-Path $PSScriptRoot "..\sre-config\agents"
 
     if (-not $python) {
-        Write-Host "  ⚠️  Python not found. Skipping agent creation." -ForegroundColor Yellow
+        Add-ConfigurationFailure -Component 'Custom agents' -Reason 'Python runtime not found; custom agents were not created'
     }
     elseif (-not (Test-Path $converterScript)) {
-        Write-Host "  ⚠️  Converter script not found: $converterScript" -ForegroundColor Yellow
+        Add-ConfigurationFailure -Component 'Custom agents' -Reason "Converter script not found: $converterScript"
     }
     else {
         # Test that pyyaml is available
@@ -277,7 +305,7 @@ if (-not $SkipAgents) {
 
         foreach ($yamlFile in $agentFiles) {
             if (-not (Test-Path $yamlFile)) {
-                Write-Host "  ⚠️  Agent file not found: $(Split-Path $yamlFile -Leaf)" -ForegroundColor Yellow
+                Add-ConfigurationFailure -Component 'Custom agents' -Reason "Agent file not found: $(Split-Path $yamlFile -Leaf)"
                 continue
             }
 
@@ -289,7 +317,7 @@ if (-not $SkipAgents) {
             $jsonBody = & $python @convertArgs 2>&1
 
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($jsonBody)) {
-                Write-Host "  ⚠️  YAML conversion failed for $agentFileName" -ForegroundColor Yellow
+                Add-ConfigurationFailure -Component "Custom agents/$agentFileName" -Reason 'YAML conversion failed'
                 continue
             }
 
@@ -299,7 +327,7 @@ if (-not $SkipAgents) {
                 $customAgentName = $agentObj.name
             }
             catch {
-                Write-Host "  ⚠️  Invalid JSON from $agentFileName" -ForegroundColor Yellow
+                Add-ConfigurationFailure -Component "Custom agents/$agentFileName" -Reason 'Converter returned invalid JSON'
                 continue
             }
 
@@ -316,7 +344,7 @@ if (-not $SkipAgents) {
                 $createdAgents += $customAgentName
             }
             else {
-                Write-Host "    ⚠️  HTTP $($resp.StatusCode) for $customAgentName" -ForegroundColor Yellow
+                Add-ConfigurationFailure -Component "Custom agent/$customAgentName" -Reason "HTTP $($resp.StatusCode)"
                 if ($resp.Body.Length -gt 0) {
                     try {
                         $errObj = $resp.Body | ConvertFrom-Json
@@ -338,6 +366,9 @@ if (-not $SkipAgents) {
                 Write-Host "  📊 $($agentList.Count) custom agent(s) registered" -ForegroundColor Green
             }
             catch {}
+        }
+        else {
+            Add-ConfigurationFailure -Component 'Custom agent verification' -Reason "HTTP $($listResp.StatusCode)"
         }
     }
 }
@@ -375,7 +406,7 @@ if (-not $SkipConnectors) {
         Write-Host "    ✅ Azure Monitor connector created" -ForegroundColor Green
     }
     else {
-        Write-Host "    ⚠️  HTTP $($resp.StatusCode) — Azure Monitor connector may need manual setup" -ForegroundColor Yellow
+        Add-ConfigurationFailure -Component 'Connector/azure-monitor' -Reason "HTTP $($resp.StatusCode)"
     }
 
     # 3b: GitHub MCP connector (optional)
@@ -405,7 +436,7 @@ if (-not $SkipConnectors) {
             Write-Host "    ✅ GitHub MCP connector created" -ForegroundColor Green
         }
         else {
-            Write-Host "    ⚠️  HTTP $($resp.StatusCode) — GitHub connector may need manual setup in portal" -ForegroundColor Yellow
+            Add-ConfigurationFailure -Component 'Connector/github-mcp' -Reason "HTTP $($resp.StatusCode)"
             Write-Host "       Use the pre-configured GitHub card in Settings > Connectors" -ForegroundColor Gray
         }
     }
@@ -435,7 +466,7 @@ if (-not $SkipConnectors) {
         Write-Host "    📌 Authorize in portal: https://sre.azure.com → Settings → Connectors → Outlook → Authorize" -ForegroundColor Gray
     }
     else {
-        Write-Host "    ⚠️  HTTP $($resp.StatusCode) — Outlook connector may need manual setup" -ForegroundColor Yellow
+        Add-ConfigurationFailure -Component 'Connector/outlook' -Reason "HTTP $($resp.StatusCode)"
         Write-Host "       Create it in the portal: Settings → Connectors → Add → Outlook" -ForegroundColor Gray
     }
 }
@@ -473,7 +504,7 @@ if ($listResp.StatusCode -eq 200) {
     }
 }
 else {
-    Write-Host "  ⚠️  HTTP $($listResp.StatusCode) — could not check incident filters" -ForegroundColor Yellow
+    Add-ConfigurationFailure -Component 'Incident-filter verification' -Reason "HTTP $($listResp.StatusCode)"
 }
 
 # ============================================================================
@@ -505,7 +536,7 @@ if (-not $SkipScheduledTasks) {
         Write-Host "  ✅ Scheduled task 'daily-health-check' created (runs daily at 08:00 UTC)" -ForegroundColor Green
     }
     else {
-        Write-Host "  ⚠️  HTTP $($resp.StatusCode) — scheduled task creation failed" -ForegroundColor Yellow
+        Add-ConfigurationFailure -Component 'Scheduled task/daily-health-check' -Reason "HTTP $($resp.StatusCode)"
     }
 }
 else {
@@ -566,3 +597,13 @@ Write-Host "  4. Apply a breakable scenario: break-oom, break-crash, etc." -Fore
 Write-Host "  5. Ask the agent: 'Why are pods crashing in the pets namespace?'" -ForegroundColor White
 Write-Host "  6. Or invoke directly: /agent incident-handler" -ForegroundColor White
 Write-Host ""
+
+if ($configurationFailures.Count -gt 0) {
+    Write-Host "Configuration completed with $($configurationFailures.Count) failure(s):" -ForegroundColor Red
+    foreach ($failure in $configurationFailures) {
+        Write-Host "  - $failure" -ForegroundColor Red
+    }
+    exit 1
+}
+
+Write-Host "Configuration verified successfully." -ForegroundColor Green

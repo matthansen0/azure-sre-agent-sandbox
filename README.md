@@ -5,7 +5,7 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 ## 🎯 What This Lab Provides
 
 - **Azure Kubernetes Service (AKS)** with a multi-pod e-commerce demo application
-- **8 breakable scenarios** for demonstrating SRE Agent diagnosis
+- **10 breakable scenarios** for demonstrating SRE Agent diagnosis
 - **Azure SRE Agent** deployed automatically via Bicep for AI-powered diagnostics
 - **SRE Agent configuration layer**: Knowledge base runbooks, custom agents, connectors, and scheduled tasks
 - **Full observability stack**: Log Analytics, Application Insights, Managed Grafana

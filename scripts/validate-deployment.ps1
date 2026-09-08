@@ -68,6 +68,8 @@ Write-Host @"
 
 $totalChecks = 0
 $passedChecks = 0
+$requiredDeployments = @('rabbitmq', 'mongodb', 'product-service', 'order-service', 'makeline-service', 'store-front', 'store-admin', 'virtual-customer', 'virtual-worker')
+$requiredServices = @('rabbitmq', 'mongodb', 'product-service', 'order-service', 'makeline-service', 'store-front', 'store-admin')
 
 # =============================================================================
 # AZURE RESOURCE CHECKS
@@ -167,11 +169,11 @@ if (Write-Check "kubectl can connect to cluster" ($LASTEXITCODE -eq 0)) {
 # Check node status
 $nodes = kubectl get nodes -o json 2>$null | ConvertFrom-Json
 $totalChecks++
-$healthyNodes = ($nodes.items | Where-Object { 
+$healthyNodes = @($nodes.items | Where-Object {
         ($_.status.conditions | Where-Object { $_.type -eq "Ready" }).status -eq "True" 
     }).Count
-$totalNodes = $nodes.items.Count
-if (Write-Check "All nodes are Ready" ($healthyNodes -eq $totalNodes) "$healthyNodes/$totalNodes nodes ready") {
+$totalNodes = @($nodes.items).Count
+if (Write-Check "At least one node is Ready" ($totalNodes -gt 0 -and $healthyNodes -eq $totalNodes) "$healthyNodes/$totalNodes nodes ready") {
     $passedChecks++
 }
 
@@ -190,11 +192,20 @@ else {
     Write-Host "  ⚠️  Run: kubectl apply -f k8s/base/application.yaml" -ForegroundColor Yellow
 }
 
+# Check that the baseline manifest's required deployments exist.
+$deployments = kubectl get deployment -n pets -o json 2>$null | ConvertFrom-Json
+$deploymentNames = @($deployments.items | ForEach-Object { $_.metadata.name })
+$missingDeployments = @($requiredDeployments | Where-Object { $_ -notin $deploymentNames })
+$totalChecks++
+if (Write-Check "All required deployments exist" ($null -ne $namespace -and $missingDeployments.Count -eq 0) $(if ($missingDeployments.Count -gt 0) { "Missing: $($missingDeployments -join ', ')" } else { "Expected deployments present" })) {
+    $passedChecks++
+}
+
 # Check pods
 if ($namespace) {
     $pods = kubectl get pods -n pets -o json 2>$null | ConvertFrom-Json
     
-    if ($pods.items.Count -gt 0) {
+    if (@($pods.items).Count -gt 0) {
         Write-Host "`n  Pod Status:" -ForegroundColor White
         
         foreach ($pod in $pods.items) {
@@ -221,16 +232,27 @@ if ($namespace) {
         Write-Host "`n  Summary: $runningPods/$($pods.items.Count) pods running" -ForegroundColor $(if ($runningPods -eq $pods.items.Count) { "Green" } else { "Yellow" })
     }
     else {
-        Write-Host "  ⚠️  No pods found in 'pets' namespace" -ForegroundColor Yellow
+        $totalChecks++
+        Write-Check "Pods exist in 'pets' namespace" $false "No pods were returned; the application is not ready." | Out-Null
         Write-Host "     Run: kubectl apply -f k8s/base/application.yaml" -ForegroundColor Gray
     }
+}
+else {
+    $totalChecks++
+    Write-Check "Pods exist in 'pets' namespace" $false "Namespace is unavailable." | Out-Null
 }
 
 # Check services
 Write-Host "`n  Services:" -ForegroundColor White
 $services = kubectl get svc -n pets -o json 2>$null | ConvertFrom-Json
+$serviceNames = @($services.items | ForEach-Object { $_.metadata.name })
+$missingServices = @($requiredServices | Where-Object { $_ -notin $serviceNames })
+$totalChecks++
+if (Write-Check "All required services exist" ($null -ne $namespace -and $missingServices.Count -eq 0) $(if ($missingServices.Count -gt 0) { "Missing: $($missingServices -join ', ')" } else { "Expected services present" })) {
+    $passedChecks++
+}
 
-foreach ($svc in $services.items) {
+foreach ($svc in @($services.items | Where-Object { $_.metadata.name -in $requiredServices })) {
     $svcName = $svc.metadata.name
     $svcType = $svc.spec.type
     $hasEndpoint = $false
@@ -244,7 +266,7 @@ foreach ($svc in $services.items) {
         $endpoint = if ($hasEndpoint) { $externalIP } else { "Pending" }
     }
     elseif ($svcType -eq "ClusterIP") {
-        $hasEndpoint = $true
+        $hasEndpoint = $null -ne $svc.spec.clusterIP -and $svc.spec.clusterIP -ne 'None'
         $endpoint = $svc.spec.clusterIP
     }
     else {
