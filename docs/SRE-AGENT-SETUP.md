@@ -266,6 +266,19 @@ deployment verifier requires those resources only when the profile is enabled.
 Review-mode remediation and incident response plans remain separate controls;
 incident-filter creation is still subject to the compatibility probe below.
 
+### Grafana Dashboard
+
+Managed Grafana is linked to the Azure Monitor Workspace and receives the
+`SRE Lab - AKS Overview` dashboard during deployment. Open the Grafana URL from
+the deployment output to view pod readiness, workload CPU, pod restarts, and
+node memory. Dashboard provisioning uses Entra authentication with the
+`https://dashboard.azure.com` audience; API keys remain disabled.
+
+Container Insights is verified separately by checking ready `ama-logs` pods,
+the `ContainerInsightsExtension` DCR association, and recent `ContainerLogV2`
+and `KubePodInventory` records. The current profile intentionally uses
+`ContainerLogV2`; an empty legacy `ContainerLog` table is therefore expected.
+
 ### Governance Profile
 
 The local governance contract in `sre-config/governance/review-profile.yaml` is

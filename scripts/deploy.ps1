@@ -777,6 +777,28 @@ else {
     throw "Deployment validation script not found at $validateScript"
 }
 
+$telemetryScript = Join-Path $PSScriptRoot "verify-telemetry.ps1"
+if (Test-Path $telemetryScript) {
+    & pwsh -NoLogo -NoProfile -File $telemetryScript -ResourceGroupName $resourceGroupName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Container Insights telemetry verification failed. Review the telemetry output above."
+    }
+}
+else {
+    throw "Telemetry verification script not found at $telemetryScript"
+}
+
+$grafanaScript = Join-Path $PSScriptRoot "configure-grafana.ps1"
+if (Test-Path $grafanaScript) {
+    & pwsh -NoLogo -NoProfile -File $grafanaScript -ResourceGroupName $resourceGroupName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Grafana dashboard provisioning failed. Review the Grafana output above."
+    }
+}
+else {
+    throw "Grafana configuration script not found at $grafanaScript"
+}
+
 if ($sreAgentSkipReason -and -not $outputs.sreAgentId.value) {
     Write-Host "`nℹ️  Azure SRE Agent was not deployed: $sreAgentSkipReason" -ForegroundColor Yellow
     Write-Host "   Re-run without -SkipSreAgent once Microsoft.App/agents is available in the subscription." -ForegroundColor Gray

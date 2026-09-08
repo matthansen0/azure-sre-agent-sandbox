@@ -9,6 +9,7 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 - **Azure SRE Agent** deployed automatically via Bicep for AI-powered diagnostics
 - **SRE Agent configuration layer**: Knowledge base runbooks, custom agents, connectors, and scheduled tasks
 - **Full observability stack**: Log Analytics, Application Insights, Managed Grafana
+- **Working observability views**: Container Insights ingestion verification and an AKS Grafana dashboard
 - **Ready-to-use scripts** for deployment and teardown
 - **Dev container** for consistent development experience
 
@@ -113,6 +114,20 @@ See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions
 | + SRE Agent | ~$32-38 | ~$950-1,150 |
 
 See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
+
+### Observability
+
+The deployment verifies recent Container Insights records in Log Analytics and
+provisions the `SRE Lab - AKS Overview` dashboard in Managed Grafana. The Grafana
+URL is included in deployment output. To remove only the dashboard:
+
+```powershell
+.\scripts\configure-grafana.ps1 -ResourceGroupName "rg-srelab-eastus2" -Cleanup -ConfirmCleanup
+```
+
+Container Insights uses the current `ContainerLogV2` profile and verifies the
+monitoring agent, DCR association, log records, and Kubernetes inventory before
+deployment is considered ready.
 
 ## 🔧 Available Scenarios
 
