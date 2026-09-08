@@ -52,6 +52,12 @@ param(
     [switch]$SkipSreAgent,
 
     [Parameter()]
+    [switch]$EnableAzureMonitorAutomation,
+
+    [Parameter()]
+    [switch]$EnableMicrosoftLearnMcp,
+
+    [Parameter()]
     [switch]$WhatIf,
 
     [Parameter()]
@@ -485,6 +491,8 @@ else {
 }
 
 $deploySreAgentValue = if ($deploySreAgent) { 'true' } else { 'false' }
+$deployAlertsValue = if ($EnableAzureMonitorAutomation) { 'true' } else { 'false' }
+$deployActionGroupValue = if ($EnableAzureMonitorAutomation) { 'true' } else { 'false' }
 
 # Confirm subscription
 Write-Host "`n⚠️  Resources will be deployed to subscription: $($account.name)" -ForegroundColor Yellow
@@ -511,6 +519,7 @@ Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Azure Monitor:   $(if ($EnableAzureMonitorAutomation) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
 }
@@ -523,7 +532,7 @@ if ($WhatIf) {
     $whatIfOutput = az deployment sub what-if `
         --location $Location `
         --template-file $bicepFile `
-        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue `
+        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue deployAlerts=$deployAlertsValue deployActionGroup=$deployActionGroupValue `
         --name $deploymentName 2>&1 | Out-String
 
     if ($LASTEXITCODE -ne 0) {
@@ -551,7 +560,7 @@ try {
         "az deployment sub create",
         "--location $Location",
         "--template-file `"$bicepFile`"",
-        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue",
+        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue deployAlerts=$deployAlertsValue deployActionGroup=$deployActionGroupValue",
         "--name $deploymentName",
         "--only-show-errors",
         "--output json"
@@ -706,7 +715,10 @@ $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
 if (Test-Path $k8sPath) {
     kubectl apply -f $k8sPath
-    Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to apply the demo application manifest: $k8sPath"
+    }
+    Write-Host "  ✅ Demo application manifest applied" -ForegroundColor Green
     
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
     $deploymentNamesRaw = kubectl get deployment -n pets -o jsonpath='{.items[*].metadata.name}' 2>$null
@@ -714,11 +726,14 @@ if (Test-Path $k8sPath) {
     if ($deploymentNamesRaw) {
         $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     }
+    if ($deploymentNames.Count -eq 0) {
+        throw "No deployments were found in the pets namespace after applying the demo application manifest."
+    }
 
     foreach ($deploymentName in $deploymentNames) {
         kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s 2>$null
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
+            throw "Rollout failed or timed out for deployment/$deploymentName. Check: kubectl describe deployment/$deploymentName -n pets"
         }
     }
     
@@ -755,11 +770,33 @@ $validateScript = Join-Path $PSScriptRoot "validate-deployment.ps1"
 if (Test-Path $validateScript) {
     & pwsh -NoLogo -NoProfile -File $validateScript -ResourceGroupName $resourceGroupName
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  ⚠️  Validation found issues, but the infrastructure deployment completed. Review the validation output above." -ForegroundColor Yellow
+        throw "Deployment validation failed. Review the validation output above before using the lab."
     }
 }
 else {
-    Write-Host "  ⚠️  Validation script not found, skipping..." -ForegroundColor Yellow
+    throw "Deployment validation script not found at $validateScript"
+}
+
+$telemetryScript = Join-Path $PSScriptRoot "verify-telemetry.ps1"
+if (Test-Path $telemetryScript) {
+    & pwsh -NoLogo -NoProfile -File $telemetryScript -ResourceGroupName $resourceGroupName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Container Insights telemetry verification failed. Review the telemetry output above."
+    }
+}
+else {
+    throw "Telemetry verification script not found at $telemetryScript"
+}
+
+$grafanaScript = Join-Path $PSScriptRoot "configure-grafana.ps1"
+if (Test-Path $grafanaScript) {
+    & pwsh -NoLogo -NoProfile -File $grafanaScript -ResourceGroupName $resourceGroupName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Grafana dashboard provisioning failed. Review the Grafana output above."
+    }
+}
+else {
+    throw "Grafana configuration script not found at $grafanaScript"
 }
 
 if ($sreAgentSkipReason -and -not $outputs.sreAgentId.value) {
@@ -773,12 +810,34 @@ if ($outputs.sreAgentId.value) {
     $configureScript = Join-Path $PSScriptRoot "configure-sre-agent.ps1"
     if (Test-Path $configureScript) {
         try {
-            & $configureScript -ResourceGroupName $resourceGroupName
+            $configureParams = @{ ResourceGroupName = $resourceGroupName }
+            if ($EnableMicrosoftLearnMcp) {
+                $configureParams.EnableMicrosoftLearnMcp = $true
+            }
+            & $configureScript @configureParams
+            if ($LASTEXITCODE -ne 0) {
+                throw "SRE Agent configuration returned exit code $LASTEXITCODE"
+            }
             Write-Host "  ✅ SRE Agent configuration complete" -ForegroundColor Green
+
+            $verifyScript = Join-Path $PSScriptRoot "verify-sre-agent-configuration.ps1"
+            if (-not (Test-Path $verifyScript)) {
+                throw "SRE Agent verifier not found at $verifyScript"
+            }
+            $verifyParams = @{ ResourceGroupName = $resourceGroupName }
+            if ($EnableAzureMonitorAutomation) {
+                $verifyParams.RequireAzureMonitorAutomation = $true
+            }
+            if ($EnableMicrosoftLearnMcp) {
+                $verifyParams.RequireMicrosoftLearnMcp = $true
+            }
+            & $verifyScript @verifyParams
+            if ($LASTEXITCODE -ne 0) {
+                throw "SRE Agent configuration verification returned exit code $LASTEXITCODE"
+            }
         }
         catch {
-            Write-Host "  ⚠️  SRE Agent configuration had issues: $_" -ForegroundColor Yellow
-            Write-Host "      You can re-run it separately: .\scripts\configure-sre-agent.ps1 -ResourceGroupName $resourceGroupName" -ForegroundColor Gray
+            throw "SRE Agent configuration failed: $_"
         }
     }
     else {

@@ -5,10 +5,11 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 ## 🎯 What This Lab Provides
 
 - **Azure Kubernetes Service (AKS)** with a multi-pod e-commerce demo application
-- **8 breakable scenarios** for demonstrating SRE Agent diagnosis
+- **10 breakable scenarios** for demonstrating SRE Agent diagnosis
 - **Azure SRE Agent** deployed automatically via Bicep for AI-powered diagnostics
 - **SRE Agent configuration layer**: Knowledge base runbooks, custom agents, connectors, and scheduled tasks
 - **Full observability stack**: Log Analytics, Application Insights, Managed Grafana
+- **Working observability views**: Container Insights ingestion verification and an AKS Grafana dashboard
 - **Ready-to-use scripts** for deployment and teardown
 - **Dev container** for consistent development experience
 
@@ -33,6 +34,17 @@ az login --use-device-code
 
 # 2. Deploy infrastructure (~15-25 minutes)
 .\scripts\deploy.ps1 -Location eastus2 -Yes
+```
+
+To opt into the Azure Monitor automation profile, add
+`-EnableAzureMonitorAutomation`. The core deployment leaves alert rules and the
+default action group disabled.
+
+Inspect or explicitly remove the enabled profile with:
+
+```powershell
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2"
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2" -Cleanup -ConfirmCleanup
 ```
 
 > 💡 **Tip**: Type `menu` in the terminal to see all available commands including break scenarios, fix commands, and kubectl shortcuts.
@@ -88,7 +100,8 @@ To enable source code analysis and automated issue creation:
 .\scripts\configure-sre-agent.ps1 `
     -ResourceGroupName "rg-srelab-eastus2" `
     -GitHubPat $env:GITHUB_PAT `
-    -GitHubRepo "owner/repo"
+    -GitHubRepo "owner/repo" `
+    -GitHubBranch "main"
 ```
 
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions, or [docs/PROMPTS-GUIDE.md](docs/PROMPTS-GUIDE.md) for a full catalog of prompts to try.
@@ -101,6 +114,20 @@ See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions
 | + SRE Agent | ~$32-38 | ~$950-1,150 |
 
 See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
+
+### Observability
+
+The deployment verifies recent Container Insights records in Log Analytics and
+provisions the `SRE Lab - AKS Overview` dashboard in Managed Grafana. The Grafana
+URL is included in deployment output. To remove only the dashboard:
+
+```powershell
+.\scripts\configure-grafana.ps1 -ResourceGroupName "rg-srelab-eastus2" -Cleanup -ConfirmCleanup
+```
+
+Container Insights uses the current `ContainerLogV2` profile and verifies the
+monitoring agent, DCR association, log records, and Kubernetes inventory before
+deployment is considered ready.
 
 ## 🔧 Available Scenarios
 
@@ -129,12 +156,17 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
 | `.\scripts\configure-sre-agent.ps1 -ResourceGroupName <rg>` | Configure SRE Agent (KB, agents, connectors) |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario oom-killed` | Run, restore, and report one scenario lifecycle |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario crash-loop` | Run, restore, and report another scenario lifecycle |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario image-pull` | Run, restore, and report yet another scenario lifecycle |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
 **Deploy script parameters:**
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
+- `-EnableAzureMonitorAutomation`: Deploy Azure Monitor alerts and the default action group (disabled by default)
+- `-EnableMicrosoftLearnMcp`: Enable the credential-free Microsoft Learn MCP connector (disabled by default)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)
 

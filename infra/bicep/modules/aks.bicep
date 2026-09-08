@@ -130,6 +130,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-02-01' = {
         config: {
           logAnalyticsWorkspaceResourceID: logAnalyticsWorkspaceId
           useAADAuth: 'true'
+          enableContainerLogV2: 'true'
         }
       }
       azurepolicy: {
@@ -163,6 +164,10 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-02-01' = {
   }
 }
 
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: last(split(logAnalyticsWorkspaceId, '/'))
+}
+
 // Grant AKS access to ACR for image pulls
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(aks.id, acrId, 'acrpull')
@@ -175,6 +180,93 @@ resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalId: aks.properties.identityProfile.kubeletidentity.objectId
     principalType: 'ServicePrincipal'
   }
+}
+
+resource logAnalyticsContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(logAnalyticsWorkspaceId, aks.id, 'LogAnalyticsContributorKubelet')
+  scope: logAnalyticsWorkspace
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '92aaf0da-9dab-42b6-94a3-d43ce8d16293'
+    )
+    principalId: aks.properties.identityProfile.kubeletidentity.objectId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource containerInsightsDcr 'Microsoft.Insights/dataCollectionRules@2022-06-01' = {
+  name: 'MSCI-${replace(location, ' ', '')}-${aks.name}'
+  location: location
+  tags: tags
+  kind: 'Linux'
+  properties: {
+    dataSources: {
+      extensions: [
+        {
+          name: 'ContainerInsightsExtension'
+          streams: [
+            'Microsoft-ContainerLogV2'
+            'Microsoft-KubeEvents'
+            'Microsoft-KubePodInventory'
+            'Microsoft-ContainerInventory'
+            'Microsoft-ContainerNodeInventory'
+            'Microsoft-KubeNodeInventory'
+            'Microsoft-KubeServices'
+            'Microsoft-Perf'
+            'Microsoft-InsightsMetrics'
+          ]
+          extensionSettings: {
+            dataCollectionSettings: {
+              interval: '1m'
+              namespaceFilteringMode: 'Off'
+              namespaces: []
+              enableContainerLogV2: true
+            }
+          }
+          extensionName: 'ContainerInsights'
+        }
+      ]
+    }
+    destinations: {
+      logAnalytics: [
+        {
+          workspaceResourceId: logAnalyticsWorkspaceId
+          name: 'ciworkspace'
+        }
+      ]
+    }
+    dataFlows: [
+      {
+        streams: [
+          'Microsoft-ContainerLogV2'
+          'Microsoft-KubeEvents'
+          'Microsoft-KubePodInventory'
+          'Microsoft-ContainerInventory'
+          'Microsoft-ContainerNodeInventory'
+          'Microsoft-KubeNodeInventory'
+          'Microsoft-KubeServices'
+          'Microsoft-Perf'
+          'Microsoft-InsightsMetrics'
+        ]
+        destinations: [
+          'ciworkspace'
+        ]
+      }
+    ]
+  }
+}
+
+// The monitoring addon consumes this DCR to collect container logs and inventory.
+resource containerInsightsDcra 'Microsoft.ContainerService/managedClusters/providers/dataCollectionRuleAssociations@2022-06-01' = {
+  name: '${aks.name}/microsoft.insights/ContainerInsightsExtension'
+  properties: {
+    description: 'Container Insights data collection association'
+    dataCollectionRuleId: containerInsightsDcr.id
+  }
+  dependsOn: [
+    containerInsightsDcr
+  ]
 }
 
 // =============================================================================

@@ -148,6 +148,19 @@ resource grafanaMonitoringReaderRole 'Microsoft.Authorization/roleAssignments@20
   }
 }
 
+resource aksMetricsPublisherRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(azureMonitorWorkspace.id, aksCluster.id, 'MonitoringMetricsPublisher')
+  scope: azureMonitorWorkspace
+  properties: {
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      '3913510d-42f4-4e42-8a64-420c390055eb'
+    )
+    principalId: aksCluster.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // =============================================================================
 // OUTPUTS
 // =============================================================================

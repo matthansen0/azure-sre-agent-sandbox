@@ -231,8 +231,69 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 .\scripts\configure-sre-agent.ps1 `
     -ResourceGroupName "rg-srelab-eastus2" `
     -GitHubPat $env:GITHUB_PAT `
-    -GitHubRepo "owner/repo"
+   -GitHubRepo "owner/repo" `
+   -GitHubBranch "main"
 ```
+
+When GitHub is enabled, the script preflights repository and branch access,
+restricts agent instructions to that scope, redacts credentials from evidence,
+requires review before issue creation, and prohibits pull-request writes. The
+default deployment remains GitHub-free.
+
+Microsoft Learn MCP is an independent opt-in track and requires no customer
+credentials:
+
+```powershell
+.\scripts\configure-sre-agent.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -EnableMicrosoftLearnMcp
+```
+
+The connector uses `https://learn.microsoft.com/api/mcp`. Its setup failure is
+reported when enabled, but it never blocks the core configuration when omitted.
+
+### Optional Azure Monitor Automation Profile
+
+The core deployment does not create alert rules or an action group. Enable the
+profile explicitly when testing alert-driven workflows:
+
+```powershell
+.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
+```
+
+This deploys four symptom-focused alerts and the `ag-srelab` action group. The
+deployment verifier requires those resources only when the profile is enabled.
+Review-mode remediation and incident response plans remain separate controls;
+incident-filter creation is still subject to the compatibility probe below.
+
+### Grafana Dashboard
+
+Managed Grafana is linked to the Azure Monitor Workspace and receives the
+`SRE Lab - AKS Overview` dashboard during deployment. Open the Grafana URL from
+the deployment output to view pod readiness, workload CPU, pod restarts, and
+node memory. Dashboard provisioning uses Entra authentication with the
+`https://dashboard.azure.com` audience; API keys remain disabled.
+
+Container Insights is verified separately by checking ready `ama-logs` pods,
+the `ContainerInsightsExtension` DCR association, and recent `ContainerLogV2`
+and `KubePodInventory` records. The current profile intentionally uses
+`ContainerLogV2`; an empty legacy `ContainerLog` table is therefore expected.
+
+### Governance Profile
+
+The local governance contract in `sre-config/governance/review-profile.yaml` is
+disabled by default and keeps Review mode, explicit approval for writes, secret
+redaction, and `pets`/demo-resource-group scope as the intended policy. Validate
+it with:
+
+```powershell
+.\scripts\validate-sre-agent-governance.py
+.\scripts\report-sre-agent-capabilities.ps1 -ResourceGroupName "rg-srelab-eastus2"
+```
+
+The report uses read-only calls and labels unsupported hooks and broad RBAC
+boundaries as unknown or unenforceable; it does not claim prompt text alone can
+enforce them.
 
 ### What Gets Configured
 
@@ -247,7 +308,7 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
 
-> **Note:** Incident response plans must be created manually in the [SRE Agent portal](https://sre.azure.com) — the script prints guidance for this.
+> **Note:** The configuration script only reads incident-filter state. Creation support is probed separately because the service has not published a stable dataplane request schema.
 
 ### Post-Configuration: Authorize Outlook
 
@@ -260,7 +321,19 @@ The Outlook connector enables the `SendOutlookEmail` tool so agents can email yo
 
 ### Post-Configuration: Create Incident Response Plan
 
-Incident response plans **cannot** be created via the dataplane API — the `incidentFilters` endpoint is read-only. Create one in the portal:
+Until the compatibility probe succeeds for the deployed service, treat incident response plan creation as portal-only. Do not put credentials or unreviewed payloads in the repository.
+
+To run the isolated create/read/delete probe, provide a locally reviewed JSON payload:
+
+```powershell
+.\scripts\probe-incident-filter-api.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -PayloadPath .\incident-filter-payload.json
+```
+
+The probe uses a temporary name, prints only status codes and truncated response bodies, and deletes the test filter only after a successful create. Exit code `2` means creation is still unsupported; exit code `1` means the probe itself could not run or cleanup failed.
+
+If the probe reports unsupported creation, create one in the portal:
 
 1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Builder** → **Incident response plans**
 2. Click **New incident response plan**
