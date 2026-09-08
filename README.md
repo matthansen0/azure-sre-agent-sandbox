@@ -92,7 +92,8 @@ To enable source code analysis and automated issue creation:
 .\scripts\configure-sre-agent.ps1 `
     -ResourceGroupName "rg-srelab-eastus2" `
     -GitHubPat $env:GITHUB_PAT `
-    -GitHubRepo "owner/repo"
+    -GitHubRepo "owner/repo" `
+    -GitHubBranch "main"
 ```
 
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions, or [docs/PROMPTS-GUIDE.md](docs/PROMPTS-GUIDE.md) for a full catalog of prompts to try.

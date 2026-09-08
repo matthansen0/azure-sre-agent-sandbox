@@ -231,8 +231,14 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 .\scripts\configure-sre-agent.ps1 `
     -ResourceGroupName "rg-srelab-eastus2" `
     -GitHubPat $env:GITHUB_PAT `
-    -GitHubRepo "owner/repo"
+   -GitHubRepo "owner/repo" `
+   -GitHubBranch "main"
 ```
+
+When GitHub is enabled, the script preflights repository and branch access,
+restricts agent instructions to that scope, redacts credentials from evidence,
+requires review before issue creation, and prohibits pull-request writes. The
+default deployment remains GitHub-free.
 
 Microsoft Learn MCP is an independent opt-in track and requires no customer
 credentials:

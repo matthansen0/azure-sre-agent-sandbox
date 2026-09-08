@@ -54,6 +54,9 @@ param(
     [string]$GitHubRepo = '',
 
     [Parameter()]
+    [string]$GitHubBranch = 'main',
+
+    [Parameter()]
     [switch]$SkipKnowledgeBase,
 
     [Parameter()]
@@ -71,6 +74,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $configurationFailures = [System.Collections.Generic.List[string]]::new()
+$githubPreflightPassed = $false
 
 function Add-ConfigurationFailure {
     param([Parameter(Mandatory)][string]$Component, [Parameter(Mandatory)][string]$Reason)
@@ -82,6 +86,23 @@ function Add-ConfigurationFailure {
 function Test-SuccessStatus {
     param([int]$StatusCode)
     return $StatusCode -ge 200 -and $StatusCode -lt 300
+}
+
+function Invoke-GitHubApi {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Token
+    )
+
+    $output = & curl -sS -w "`n%{http_code}" "https://api.github.com$Path" `
+        -H "Accept: application/vnd.github+json" `
+        -H "Authorization: Bearer $Token" `
+        -H 'X-GitHub-Api-Version: 2022-11-28' 2>&1
+    $lines = ($output -join "`n") -split "`n"
+    $statusCode = 0
+    [void][int]::TryParse($lines[-1].Trim(), [ref]$statusCode)
+    $body = if ($lines.Count -gt 1) { ($lines[0..($lines.Count - 2)]) -join "`n" } else { '' }
+    return @{ StatusCode = $statusCode; Body = $body }
 }
 
 # ============================================================================
@@ -264,7 +285,33 @@ if (-not $SkipAgents) {
     Write-Host "`n🤖 Step 2: Creating custom agents via dataplane v2 API..." -ForegroundColor Yellow
 
     $hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat)
+    $githubPreflightPassed = -not $hasGitHub
     $token = Get-SreAgentToken
+
+    if ($hasGitHub) {
+        if ([string]::IsNullOrWhiteSpace($GitHubRepo) -or $GitHubRepo -notmatch '^[^/\s]+/[^/\s]+$') {
+            Add-ConfigurationFailure -Component 'GitHub preflight' -Reason 'GitHubRepo must use owner/repository format when GitHubPat is provided'
+        }
+        elseif ([string]::IsNullOrWhiteSpace($GitHubBranch) -or $GitHubBranch -match '[\r\n]') {
+            Add-ConfigurationFailure -Component 'GitHub preflight' -Reason 'GitHubBranch must be a non-empty single line value'
+        }
+        else {
+            $repoResp = Invoke-GitHubApi -Path "/repos/$GitHubRepo" -Token $GitHubPat
+            if ($repoResp.StatusCode -ne 200) {
+                Add-ConfigurationFailure -Component 'GitHub preflight' -Reason "Repository access check returned HTTP $($repoResp.StatusCode)"
+            }
+            else {
+                $branchResp = Invoke-GitHubApi -Path "/repos/$GitHubRepo/branches/$([uri]::EscapeDataString($GitHubBranch))" -Token $GitHubPat
+                if ($branchResp.StatusCode -ne 200) {
+                    Add-ConfigurationFailure -Component 'GitHub preflight' -Reason "Branch '$GitHubBranch' access check returned HTTP $($branchResp.StatusCode)"
+                }
+                else {
+                    Write-Host "  ✅ GitHub scope: $GitHubRepo@$GitHubBranch" -ForegroundColor Green
+                    $githubPreflightPassed = $true
+                }
+            }
+        }
+    }
 
     # Check for Python + PyYAML
     $python = $null
@@ -292,7 +339,7 @@ if (-not $SkipAgents) {
         # Determine which agents to create
         $agentFiles = @()
 
-        if ($hasGitHub) {
+        if ($hasGitHub -and $githubPreflightPassed) {
             Write-Host "  🔗 GitHub PAT detected — deploying full incident handler with GitHub tools" -ForegroundColor Gray
             $agentFiles += Join-Path $agentsDir "incident-handler-full.yaml"
             $agentFiles += Join-Path $agentsDir "code-analyzer.yaml"
@@ -316,7 +363,7 @@ if (-not $SkipAgents) {
 
             # Convert YAML to API JSON
             $convertArgs = @($converterScript, $yamlFile)
-            if ($hasGitHub -and $GitHubRepo) { $convertArgs += $GitHubRepo }
+            if ($hasGitHub -and $githubPreflightPassed -and $GitHubRepo) { $convertArgs += $GitHubRepo }
             $jsonBody = & $python @convertArgs 2>&1
 
             if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($jsonBody)) {
@@ -328,6 +375,10 @@ if (-not $SkipAgents) {
             try {
                 $agentObj = $jsonBody | ConvertFrom-Json
                 $customAgentName = $agentObj.name
+                if ($hasGitHub -and $githubPreflightPassed) {
+                    $agentObj.properties.instructions += "`n`nGitHub safety boundary: use repository $GitHubRepo and branch $GitHubBranch only. Never print, quote, or store credentials. Redact secrets and tokens from evidence. Treat issue creation as an explicit reviewable action, request confirmation before creating it, and search for an existing incident fingerprint before creating a duplicate. Do not create or modify pull requests."
+                    $jsonBody = $agentObj | ConvertTo-Json -Depth 20 -Compress
+                }
             }
             catch {
                 Add-ConfigurationFailure -Component "Custom agents/$agentFileName" -Reason 'Converter returned invalid JSON'
@@ -386,7 +437,7 @@ if (-not $SkipConnectors) {
     Write-Host "`n🔌 Step 3: Creating connectors..." -ForegroundColor Yellow
 
     $token = Get-SreAgentToken
-    $hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat)
+    $hasGitHub = -not [string]::IsNullOrWhiteSpace($GitHubPat) -and $githubPreflightPassed
 
     # 3a: Azure Monitor connector (always)
     Write-Host "  📊 Creating Azure Monitor connector..." -ForegroundColor Gray
