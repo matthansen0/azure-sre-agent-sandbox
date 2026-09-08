@@ -134,6 +134,9 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
 | `.\scripts\configure-sre-agent.ps1 -ResourceGroupName <rg>` | Configure SRE Agent (KB, agents, connectors) |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario oom-killed` | Run, restore, and report one scenario lifecycle |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario crash-loop` | Run, restore, and report another scenario lifecycle |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario image-pull` | Run, restore, and report yet another scenario lifecycle |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
 **Deploy script parameters:**

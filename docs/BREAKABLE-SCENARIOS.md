@@ -4,6 +4,16 @@ This guide explains each failure scenario available in the demo lab and how to u
 
 ## Quick Reference
 
+For a repeatable presenter workflow that captures baseline/fault/recovery
+evidence and restores the healthy state, run:
+
+```powershell
+.\scripts\run-demo-scenario.ps1 -ResourceGroupName "rg-srelab-eastus2" -Scenario oom-killed
+```
+
+The command writes redacted JSON and Markdown reports. It exits nonzero when
+the fault is not observed, cleanup fails, or final validation is unhealthy.
+
 | Scenario | File | What Breaks | SRE Agent Diagnosis |
 |----------|------|-------------|---------------------|
 | OOMKilled | `oom-killed.yaml` | Memory exhaustion | Identifies OOM events, recommends memory limits |
