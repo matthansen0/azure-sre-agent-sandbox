@@ -1,0 +1,20 @@
+# Local governance contract for the SRE Agent demo.
+# This file is intentionally not sent to an undocumented dataplane endpoint.
+api_version: local/v1
+kind: GovernanceProfile
+spec:
+  enabled: false
+  mode: Review
+  autonomous_execution: false
+  approval_required_for_writes: true
+  allowed_azure_resource_group: rg-srelab-<location>
+  allowed_kubernetes_namespace: pets
+  secret_redaction_required: true
+  post_tool_health_check: required_when_supported
+  unsupported_capabilities: report_unknown
+  allowed_write_tools:
+    - RunAzCliWriteCommands
+  prohibited_write_targets:
+    - subscription-level resources outside the demo resource group
+    - Kubernetes namespaces outside pets
+    - pull requests

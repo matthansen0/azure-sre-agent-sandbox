@@ -266,6 +266,22 @@ deployment verifier requires those resources only when the profile is enabled.
 Review-mode remediation and incident response plans remain separate controls;
 incident-filter creation is still subject to the compatibility probe below.
 
+### Governance Profile
+
+The local governance contract in `sre-config/governance/review-profile.yaml` is
+disabled by default and keeps Review mode, explicit approval for writes, secret
+redaction, and `pets`/demo-resource-group scope as the intended policy. Validate
+it with:
+
+```powershell
+.\scripts\validate-sre-agent-governance.py
+.\scripts\report-sre-agent-capabilities.ps1 -ResourceGroupName "rg-srelab-eastus2"
+```
+
+The report uses read-only calls and labels unsupported hooks and broad RBAC
+boundaries as unknown or unenforceable; it does not claim prompt text alone can
+enforce them.
+
 ### What Gets Configured
 
 | Component | Description |
