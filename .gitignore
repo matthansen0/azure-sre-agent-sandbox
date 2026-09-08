@@ -24,6 +24,7 @@ azureconfig.json
 *.json
 !package.json
 !devcontainer.json
+!.devcontainer/devcontainer-lock.json
 !launch.json
 !tasks.json
 !settings.json
