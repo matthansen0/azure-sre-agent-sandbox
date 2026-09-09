@@ -214,6 +214,11 @@ function menu {
 menu
 EOF
 
+# Load the same commands in the PowerShell Extension integrated console.
+cat > ~/.config/powershell/Microsoft.VSCode_profile.ps1 << 'EOF'
+. "$HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
+EOF
+
 # Create kubectl completion
 kubectl completion bash | sudo tee /etc/bash_completion.d/kubectl > /dev/null
 
