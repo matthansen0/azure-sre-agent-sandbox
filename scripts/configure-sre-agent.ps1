@@ -69,6 +69,9 @@ param(
     [switch]$EnableMicrosoftLearnMcp,
 
     [Parameter()]
+    [switch]$EnableAzureMonitorAutomation,
+
+    [Parameter()]
     [switch]$SkipScheduledTasks
 )
 
@@ -600,28 +603,52 @@ if (-not $SkipScheduledTasks) {
 
     $token = Get-SreAgentToken
 
-    $taskBody = @{
-        name       = "daily-health-check"
-        type       = "ScheduledTask"
-        properties = @{
-            cronExpression = "0 8 * * *"
-            agentPrompt    = "Run a comprehensive health check of the AKS cluster in the pets namespace. Check all pod statuses, recent restarts, resource utilization, and error trends. Report any issues found with severity ratings."
-            agentName      = "cluster-health-monitor"
-            enabled        = $true
+    $scheduledTasks = @(
+        @{
+            Name = 'daily-health-check'
+            Cron = '0 8 * * *'
+            Prompt = 'Run a comprehensive health check of the AKS cluster in the pets namespace. Check all pod statuses, recent restarts, resource utilization, and error trends. Report any issues found with severity ratings.'
         }
-    } | ConvertTo-Json -Depth 5 -Compress
-
-    $resp = Invoke-DataplaneApi `
-        -Method PUT `
-        -Path "/api/v2/extendedAgent/scheduledTasks/daily-health-check" `
-        -Body $taskBody `
-        -Token $token
-
-    if ($resp.StatusCode -eq 202 -or $resp.StatusCode -eq 200) {
-        Write-Host "  ✅ Scheduled task 'daily-health-check' created (runs daily at 08:00 UTC)" -ForegroundColor Green
+    )
+    if ($EnableAzureMonitorAutomation) {
+        $scheduledTasks += @(
+            @{
+                Name = 'daily-rbac-cost-network-audit'
+                Cron = '30 8 * * *'
+                Prompt = 'Run a read-only audit of the pets demo resource group. Review RBAC scope, estimated cost signals, network configuration, and public exposure. Report findings without making changes.'
+            }
+            @{
+                Name = 'hourly-automation-health'
+                Cron = '0 * * * *'
+                Prompt = 'Run a read-only health check of the pets namespace and Azure Monitor integration. Report active failures, alert readiness, and telemetry gaps. Do not remediate.'
+            }
+        )
     }
-    else {
-        Add-ConfigurationFailure -Component 'Scheduled task/daily-health-check' -Reason "HTTP $($resp.StatusCode)"
+
+    foreach ($task in $scheduledTasks) {
+        $taskBody = @{
+            name       = $task.Name
+            type       = "ScheduledTask"
+            properties = @{
+                cronExpression = $task.Cron
+                agentPrompt    = $task.Prompt
+                agentName      = "cluster-health-monitor"
+                enabled        = $true
+            }
+        } | ConvertTo-Json -Depth 5 -Compress
+
+        $resp = Invoke-DataplaneApi `
+            -Method PUT `
+            -Path "/api/v2/extendedAgent/scheduledTasks/$($task.Name)" `
+            -Body $taskBody `
+            -Token $token
+
+        if ($resp.StatusCode -eq 202 -or $resp.StatusCode -eq 200) {
+            Write-Host "  ✅ Scheduled task '$($task.Name)' created" -ForegroundColor Green
+        }
+        else {
+            Add-ConfigurationFailure -Component "Scheduled task/$($task.Name)" -Reason "HTTP $($resp.StatusCode)"
+        }
     }
 }
 else {

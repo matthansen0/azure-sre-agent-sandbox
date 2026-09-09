@@ -107,6 +107,21 @@ else {
     Write-Host '  ℹ️  Microsoft Learn MCP connector skipped (opt-in).' -ForegroundColor Gray
 }
 
+if ($RequireAzureMonitorAutomation) {
+    foreach ($taskName in @('daily-rbac-cost-network-audit', 'hourly-automation-health')) {
+        $taskResponse = Invoke-DataplaneApi -Url "$agentEndpoint/api/v2/extendedAgent/scheduledTasks/$taskName" -Token $token
+        if ($taskResponse.StatusCode -eq 200) {
+            Write-Host "  ✅ Azure Monitor automation task/$taskName" -ForegroundColor Green
+        }
+        else {
+            Add-Failure -Component "Azure Monitor automation task/$taskName" -Reason "HTTP $($taskResponse.StatusCode)"
+        }
+    }
+}
+else {
+    Write-Host '  ℹ️  Azure Monitor automation tasks skipped (opt-in).' -ForegroundColor Gray
+}
+
 $checks = @(
     @{ Name = 'Knowledge base'; Path = '/api/v1/AgentMemory/files'; Test = { param($data) @($data.files | Where-Object { $_.isIndexed }).Count -gt 0 } },
     @{ Name = 'Custom agents'; Path = '/api/v2/extendedAgent/agents'; Test = {

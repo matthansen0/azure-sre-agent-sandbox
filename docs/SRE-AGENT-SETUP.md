@@ -266,6 +266,20 @@ deployment verifier requires those resources only when the profile is enabled.
 Review-mode remediation and incident response plans remain separate controls;
 incident-filter creation is still subject to the compatibility probe below.
 
+Inspect, pause, resume, or clean up the profile with:
+
+```powershell
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2"
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2" -Pause
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2" -Resume
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2" -RunNow -TaskName hourly-automation-health
+.\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2" -Cleanup -ConfirmCleanup
+```
+
+`-RunNow` reports exit code `2` when the current SRE Agent API does not expose
+an immediate scheduled-task endpoint. Incident-driven automation still
+requires a portal-created response plan while issue #3 is blocked.
+
 ### Grafana Dashboard
 
 Managed Grafana is linked to the Azure Monitor Workspace and receives the
