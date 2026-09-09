@@ -272,6 +272,23 @@ deployment verifier requires those resources only when the profile is enabled.
 Review-mode remediation and incident response plans remain separate controls;
 incident-filter creation is still subject to the compatibility probe below.
 
+For the fastest deterministic demo, run `break-crash`. The product service exits
+immediately, and the pod-failure and CrashLoop rules evaluate every minute. Use
+`fix-all` afterward. `break-image`, `break-pending`, and `break-oom` also map to
+the inventory-based rules. Azure Monitor log alerts do not support a 30-second
+evaluation frequency; one minute is the minimum, and Container Insights
+ingestion means the alert usually appears a few minutes after the break.
+
+| Alert | Evaluation | Demo trigger |
+|-------|------------|--------------|
+| Pod restart spike | 1 minute | `break-crash`, `break-oom`, or `break-probe` |
+| HTTP 5xx spike | 1 minute | Any request that produces a 5xx access-log entry |
+| Failed, pending, or waiting pod | 1 minute | `break-crash`, `break-image`, or `break-pending` |
+| CrashLoop, OOM, image-pull, or startup error | 1 minute | `break-crash`, `break-oom`, or `break-image` |
+
+`break-network`, `break-service`, and `break-mongodb` demonstrate dependency or
+connectivity failures and are not guaranteed to match these pod-symptom rules.
+
 Inspect, pause, resume, or clean up the profile with:
 
 ```powershell
