@@ -261,6 +261,12 @@ profile explicitly when testing alert-driven workflows:
 .\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
 ```
 
+In the dev container, use the equivalent menu command:
+
+```powershell
+deploy-monitor -Yes
+```
+
 This deploys four symptom-focused alerts and the `ag-srelab` action group. The
 deployment verifier requires those resources only when the profile is enabled.
 Review-mode remediation and incident response plans remain separate controls;
