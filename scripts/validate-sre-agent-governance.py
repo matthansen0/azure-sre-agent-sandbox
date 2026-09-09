@@ -33,8 +33,28 @@ def main() -> int:
         fail("writes must require explicit approval", failures)
     if spec.get("allowed_kubernetes_namespace") != "pets":
         fail("Kubernetes scope must be pets", failures)
+    if spec.get("allowed_azure_resource_group") != "rg-srelab-<location>":
+        fail("Azure write scope must remain limited to the demo resource group", failures)
     if not spec.get("secret_redaction_required"):
         fail("secret redaction must be required", failures)
+    if spec.get("post_tool_health_check") != "required_when_supported":
+        fail("post-tool health checks must be required when supported", failures)
+    if spec.get("unsupported_capabilities") != "report_unknown":
+        fail("unsupported governance capabilities must be reported as unknown", failures)
+
+    allowed_write_tools = set(spec.get("allowed_write_tools", []))
+    if allowed_write_tools != {"RunAzCliWriteCommands"}:
+        fail("RunAzCliWriteCommands must be the only allowed write tool", failures)
+
+    required_prohibited_targets = {
+        "subscription-level resources outside the demo resource group",
+        "Kubernetes namespaces outside pets",
+        "pull requests",
+    }
+    prohibited_targets = set(spec.get("prohibited_write_targets", []))
+    missing_targets = required_prohibited_targets - prohibited_targets
+    if missing_targets:
+        fail(f"missing prohibited write targets: {', '.join(sorted(missing_targets))}", failures)
 
     for agent_path in sorted(AGENTS_PATH.glob("*.yaml")):
         text = agent_path.read_text()

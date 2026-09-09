@@ -99,6 +99,9 @@ resource sreAgent 'Microsoft.App/agents@2025-05-01-preview' = {
       identity: managedIdentity.id
       mode: 'Review'
     }
+    incidentManagementConfiguration: {
+      type: 'AzMonitor'
+    }
     logConfiguration: {
       applicationInsightsConfiguration: {
         appId: appInsightsAppId

@@ -38,20 +38,20 @@ resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-prev
   kind: 'LogAlert'
   properties: {
     displayName: 'Pet Store - Pod restart spike'
-    description: 'Triggers quickly when restart activity is detected in the application namespace.'
+    description: 'Triggers when a container restart count increases in the application namespace.'
     enabled: true
     severity: 2
     scopes: [
       logAnalyticsWorkspaceId
     ]
     evaluationFrequency: 'PT1M'
-    windowSize: 'PT1M'
+    windowSize: 'PT5M'
     autoMitigate: true
     skipQueryValidation: true
     criteria: {
       allOf: [
         {
-          query: 'KubePodInventory | where TimeGenerated > ago(2m) | where Namespace == "${appNamespace}" | where ContainerRestartCount > 0'
+          query: 'KubePodInventory | where TimeGenerated > ago(5m) | where Namespace == "${appNamespace}" | summarize FirstRestartCount=min(ContainerRestartCount), LastRestartCount=max(ContainerRestartCount) by ContainerName | where LastRestartCount > FirstRestartCount'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
           threshold: 0
@@ -73,23 +73,23 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-preview
   kind: 'LogAlert'
   properties: {
     displayName: 'Pet Store - HTTP 5xx spike'
-    description: 'Triggers when 5xx request count increases in App Insights logs.'
+    description: 'Triggers when a 5xx response appears in application container access logs.'
     enabled: true
     severity: 1
     scopes: [
       logAnalyticsWorkspaceId
     ]
-    evaluationFrequency: 'PT5M'
-    windowSize: 'PT10M'
+    evaluationFrequency: 'PT1M'
+    windowSize: 'PT1M'
     autoMitigate: true
     skipQueryValidation: true
     criteria: {
       allOf: [
         {
-          query: 'AppRequests | where TimeGenerated > ago(10m) | where toint(ResultCode) >= 500'
+          query: 'ContainerLogV2 | where TimeGenerated > ago(2m) | where PodNamespace == "${appNamespace}" | where LogMessage has "HTTP/" | extend StatusCode=toint(extract(" ([0-9]{3}) [0-9]+ ", 1, tostring(LogMessage))) | where StatusCode >= 500'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
-          threshold: 20
+          threshold: 0
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -121,7 +121,7 @@ resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-prev
     criteria: {
       allOf: [
         {
-          query: 'KubePodInventory | where TimeGenerated > ago(2m) | where Namespace == "${appNamespace}" | where PodStatus in ("Failed", "Pending")'
+          query: 'KubePodInventory | where TimeGenerated > ago(2m) | where Namespace == "${appNamespace}" | summarize arg_max(TimeGenerated, *) by ContainerName | where PodStatus in ("Failed", "Pending") or ContainerStatus =~ "waiting"'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
           threshold: 0
@@ -143,7 +143,7 @@ resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-pr
   kind: 'LogAlert'
   properties: {
     displayName: 'Pet Store - CrashLoop/OOM detected'
-    description: 'Triggers when CrashLoopBackOff or OOM-related Kubernetes events are detected.'
+    description: 'Triggers when container inventory reports CrashLoopBackOff, OOM, image-pull, or startup errors.'
     enabled: true
     severity: 1
     scopes: [
@@ -156,7 +156,7 @@ resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-pr
     criteria: {
       allOf: [
         {
-          query: 'KubeEvents | where TimeGenerated > ago(2m) | where Namespace == "${appNamespace}" | where Reason in ("BackOff", "OOMKilled", "CrashLoopBackOff")'
+          query: 'KubePodInventory | where TimeGenerated > ago(2m) | where Namespace == "${appNamespace}" | summarize arg_max(TimeGenerated, *) by ContainerName | where ContainerStatusReason in~ ("CrashLoopBackOff", "OOMKilled", "Error", "ImagePullBackOff", "ErrImagePull")'
           timeAggregation: 'Count'
           operator: 'GreaterThan'
           threshold: 0

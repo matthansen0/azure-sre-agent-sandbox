@@ -36,17 +36,11 @@ az login --use-device-code
 .\scripts\deploy.ps1 -Location eastus2 -Yes
 ```
 
-To opt into the Azure Monitor automation profile, add
-`-EnableAzureMonitorAutomation`. The core deployment leaves alert rules and the
-default action group disabled.
+The standard deployment includes the Azure Monitor automation profile: four
+one-minute log alerts, the default action group, and scheduled SRE Agent health
+and audit tasks.
 
-```powershell
-.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
-```
-
-In the dev container, `deploy-monitor -Yes` runs the same opt-in deployment.
-
-Inspect or explicitly remove the enabled profile with:
+Inspect or explicitly remove the default profile with:
 
 ```powershell
 .\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2"
@@ -84,15 +78,16 @@ After deployment, `deploy.ps1` automatically configures the SRE Agent with:
 
 - **Knowledge base** — Runbooks for each failure category (pod failures, networking, dependencies, resource exhaustion) plus app architecture and incident report templates
 - **Custom agents** — `incident-handler` (alert investigation), `cluster-health-monitor` (proactive checks), and optionally `code-analyzer` (GitHub source code RCA)
-- **Connectors** — Azure Monitor (incident source) and optionally GitHub MCP (source code search)
-- **Scheduled tasks** — `daily-health-check` runs cluster-health-monitor every day at 08:00 UTC
+- **Connectors** — Azure Monitor and Outlook, plus optional GitHub MCP source-code search
+- **Scheduled tasks** — daily health, daily RBAC/cost/network audit, and hourly automation-health checks
+- **Incident response** — Azure Monitor platform with an enabled Review-mode AKS response plan
 
 ### Getting Started
 
 1. **Open the SRE Agent Portal** — the URL is displayed in deployment output, or visit [sre.azure.com](https://sre.azure.com)
 2. **Verify configuration** — check Builder > Agent Canvas, Knowledge Files
 3. **Break something** — `break-oom`, `break-crash`, etc.
-4. **Ask the agent to investigate** — or create an incident response plan in the portal
+4. **Ask the agent to investigate** — or let the default response plan handle a matching alert
 5. **Ask it to diagnose**:
    - "Why are pods crashing in the pets namespace?"
    - "Run a health check on my cluster"
@@ -109,6 +104,12 @@ To enable source code analysis and automated issue creation:
     -GitHubRepo "owner/repo" `
     -GitHubBranch "main"
 ```
+
+This repository provides infrastructure, Kubernetes manifests, automation, and
+runbook context. For application service-code RCA, connect the upstream
+`Azure-Samples/aks-store-demo` repository or your fork; that source code is not
+vendored here. GitHub issue creation remains reviewable and scoped to the
+selected repository and branch, and pull-request writes are prohibited.
 
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions, or [docs/PROMPTS-GUIDE.md](docs/PROMPTS-GUIDE.md) for a full catalog of prompts to try.
 
@@ -159,20 +160,18 @@ deployment is considered ready.
 | Command | Description |
 |---------|-------------|
 | `.\scripts\deploy.ps1 -Location eastus2` | Deploy all infrastructure to Azure |
-| `deploy-monitor -Yes` | Deploy with the optional Azure Monitor automation profile in the dev container |
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
 | `.\scripts\configure-sre-agent.ps1 -ResourceGroupName <rg>` | Configure SRE Agent (KB, agents, connectors) |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
 | `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario oom-killed` | Run, restore, and report one scenario lifecycle |
 | `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario crash-loop` | Run, restore, and report another scenario lifecycle |
-| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario image-pull` | Run, restore, and report yet another scenario lifecycle |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario image-pull-backoff` | Run, restore, and report yet another scenario lifecycle |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
 **Deploy script parameters:**
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
-- `-EnableAzureMonitorAutomation`: Deploy Azure Monitor alerts and the default action group (disabled by default)
 - `-EnableMicrosoftLearnMcp`: Enable the credential-free Microsoft Learn MCP connector (disabled by default)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)

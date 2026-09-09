@@ -413,7 +413,7 @@ If you've configured the Outlook connector (see [SRE-AGENT-SETUP.md](SRE-AGENT-S
 ### Try It
 
 1. **Authorize Outlook** in the SRE Agent portal (Builder > Connectors > Outlook > Authorize)
-2. **Create an incident response plan** in the portal that triggers the `incident-handler` agent
+2. **Verify the default response plan** is On and routes to `incident-handler`
 3. **Break something:** `break-oom`
 4. **Watch the agent work** — it should investigate and send an email with findings
 
@@ -427,7 +427,7 @@ The agents are configured to send reports with a subject line like:
 
 The body includes root cause analysis, affected resources, evidence collected, and recommended remediation steps.
 
-> **Note:** The incident response plan must be created manually in the [SRE Agent portal](https://sre.azure.com). See [SRE-AGENT-SETUP.md](SRE-AGENT-SETUP.md#post-configuration-create-incident-response-plan) for instructions.
+> **Note:** The response plan is created automatically. Outlook still requires interactive authorization in the [SRE Agent portal](https://sre.azure.com).
 
 ---
 

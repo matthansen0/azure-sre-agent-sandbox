@@ -1,6 +1,6 @@
-# Azure Monitor Connector — Dataplane v2 API format
+# Azure Monitor Connector — ARM connector format
 # Always created by configure-sre-agent.ps1 as the incident source
-# Reference: PUT {agentEndpoint}/api/v2/extendedAgent/connectors/azure-monitor
+# Reference: PUT {agentResourceId}/connectors/azure-monitor?api-version=2025-05-01-preview
 api_version: azuresre.ai/v2
 kind: DataConnector
 spec:

@@ -16,6 +16,7 @@ This document provides estimated costs for running the Azure SRE Agent Demo Lab.
 | **Application Insights** | ~$0.30-0.70 | ~$10-20 | Based on data volume |
 | **Managed Grafana** | ~$2.50 | ~$75 | Standard tier |
 | **Azure Monitor (Prometheus)** | ~$0.50 | ~$15 | Based on metrics volume |
+| **Azure Monitor log alerts** | Usage-based | Varies | Four 1-minute rules enabled by default |
 | **Key Vault** | ~$0.10 | ~$3 | Minimal operations |
 | **SRE Agent** | ~$10-13 | ~$292-400 | Base + execution costs |
 | **Total (without SRE Agent)** | **~$22-28** | **~$650-850** | |
@@ -94,6 +95,10 @@ Cost is based on data ingestion:
 | Query | $0.30/million samples queried |
 
 **Expected usage for demo:** ~$10-20/month
+
+The standard deployment also creates four log search alert rules evaluated every
+minute. Alert-rule charges are usage-based and vary by region; check the current
+Azure Monitor pricing page when estimating a long-running lab.
 
 ### Key Vault
 

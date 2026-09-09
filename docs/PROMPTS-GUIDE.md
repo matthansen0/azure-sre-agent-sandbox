@@ -183,13 +183,15 @@ After configuration, you can invoke subagents directly:
 
 #### Incident Response Plan
 
-The configuration script also creates a response plan that auto-triggers the `incident-handler` subagent when pod failure alerts fire. This means:
+The configuration script creates the enabled `AKS Pod Failure Handler` response
+plan. It matches P1/P2 Azure Monitor alerts whose title contains `Pet Store`,
+routes them to `incident-handler`, and runs in Review mode. This means:
 
 1. A breakable scenario causes pod crashes
 2. Azure Monitor fires an alert
 3. The SRE Agent picks up the alert
 4. The `incident-handler` subagent runs the relevant runbook automatically
-5. Findings are summarized (and optionally written to a GitHub issue)
+5. Findings and proposed remediation are presented for review before writes
 
 ### Knowledge Base
 
@@ -214,6 +216,12 @@ When you provide a GitHub PAT, the configuration script enables:
 - **Full incident-handler** — upgraded to create GitHub issues with structured reports
 - **code-analyzer subagent** — deep source code root cause analysis
 
+This repository contains the lab infrastructure, Kubernetes manifests, scripts,
+and runbooks. Connect `Azure-Samples/aks-store-demo` or your fork when the demo
+needs application service-code RCA; the service source is not included here.
+Issue creation requires review and stays within the configured repository and
+branch. Pull-request writes are prohibited.
+
 To add GitHub integration after initial setup:
 ```powershell
 .\scripts\configure-sre-agent.ps1 `
@@ -221,6 +229,22 @@ To add GitHub integration after initial setup:
     -GitHubPat $env:GITHUB_PAT `
     -GitHubRepo "owner/repo"
 ```
+
+### Microsoft Learn MCP Integration (Optional)
+
+Enable the credential-free Microsoft Learn connector with
+`-EnableMicrosoftLearnMcp`, then verify it with:
+
+```powershell
+.\scripts\verify-sre-agent-configuration.ps1 `
+    -ResourceGroupName "rg-srelab-eastus2" `
+    -RequireMicrosoftLearnMcp
+```
+
+Use this repeatable demonstration prompt:
+
+> Using Microsoft Learn, find the current Azure SRE Agent supported regions and
+> cite the documentation you used.
 
 ---
 

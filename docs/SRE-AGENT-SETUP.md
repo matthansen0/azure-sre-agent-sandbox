@@ -189,7 +189,8 @@ Once connected, you can interact with SRE Agent using natural language:
 
 ### Scheduled Tasks
 
-Create automated diagnosis tasks:
+The standard deployment creates daily health, daily RBAC/cost/network audit, and
+hourly automation-health tasks. To create additional diagnosis tasks:
 
 1. Go to **Subagent builder** in SRE Agent
 2. Click **Create scheduled task**
@@ -238,10 +239,23 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 When GitHub is enabled, the script preflights repository and branch access,
 restricts agent instructions to that scope, redacts credentials from evidence,
 requires review before issue creation, and prohibits pull-request writes. The
-default deployment remains GitHub-free.
+default deployment remains GitHub-free. This repository supplies infrastructure,
+Kubernetes, automation, and runbook context. Connect the upstream
+`Azure-Samples/aks-store-demo` repository or your fork when application
+service-code RCA is required; the service source is not vendored here.
 
-Microsoft Learn MCP is an independent opt-in track and requires no customer
-credentials:
+### Microsoft Learn MCP (Optional)
+
+Microsoft Learn MCP is an independent, credential-free track. Enable it during
+the standard deployment:
+
+```powershell
+.\scripts\deploy.ps1 `
+   -Location eastus2 `
+   -EnableMicrosoftLearnMcp
+```
+
+Or add it to an existing agent:
 
 ```powershell
 .\scripts\configure-sre-agent.ps1 `
@@ -249,28 +263,61 @@ credentials:
    -EnableMicrosoftLearnMcp
 ```
 
-The connector uses `https://learn.microsoft.com/api/mcp`. Its setup failure is
-reported when enabled, but it never blocks the core configuration when omitted.
-
-### Optional Azure Monitor Automation Profile
-
-The core deployment does not create alert rules or an action group. Enable the
-profile explicitly when testing alert-driven workflows:
+Verify the optional track independently:
 
 ```powershell
-.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
+.\scripts\verify-sre-agent-configuration.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -RequireMicrosoftLearnMcp
 ```
 
-In the dev container, use the equivalent menu command:
+Then ask: "Using Microsoft Learn, find the current Azure SRE Agent supported
+regions and cite the documentation you used." A successful response includes a
+Microsoft Learn connector tool call and source links.
+
+The connector uses `https://learn.microsoft.com/api/mcp`, requires outbound
+HTTPS on port 443 to `learn.microsoft.com`, and requires no inbound access or
+customer credentials. Its setup failure is reported when enabled, but it never
+blocks the core configuration when omitted. Remove it independently with:
 
 ```powershell
-deploy-monitor -Yes
+.\scripts\configure-sre-agent.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -RemoveMicrosoftLearnMcp
 ```
+
+The removal is idempotent and exits without changing knowledge, agents, other
+connectors, response plans, or scheduled tasks. You can also delete it from
+**Builder** > **Connectors**. Omitting `-EnableMicrosoftLearnMcp` prevents
+creation but does not delete a connector that was enabled previously.
+
+### Azure Monitor Automation Profile
+
+The standard deployment creates the Azure Monitor automation profile; no extra
+deployment flag or second command is required.
 
 This deploys four symptom-focused alerts and the `ag-srelab` action group. The
-deployment verifier requires those resources only when the profile is enabled.
-Review-mode remediation and incident response plans remain separate controls;
-incident-filter creation is still subject to the compatibility probe below.
+deployment verifier requires those resources on every standard deployment.
+The deployment also connects Azure Monitor as the incident platform and creates
+an enabled Review-mode response plan that routes matching alerts to
+`incident-handler`.
+
+For the fastest deterministic demo, run `break-crash`. The product service exits
+immediately, and the pod-failure and CrashLoop rules evaluate every minute. Use
+`fix-all` afterward. `break-image`, `break-pending`, and `break-oom` also map to
+the inventory-based rules. Azure Monitor log alerts do not support a 30-second
+evaluation frequency; one minute is the minimum, and Container Insights
+ingestion means the alert usually appears a few minutes after the break.
+
+| Alert | Evaluation | Demo trigger |
+|-------|------------|--------------|
+| Pod restart spike | 1 minute | `break-crash`, `break-oom`, or `break-probe` |
+| HTTP 5xx spike | 1 minute | Any request that produces a 5xx access-log entry |
+| Failed, pending, or waiting pod | 1 minute | `break-crash`, `break-image`, or `break-pending` |
+| CrashLoop, OOM, image-pull, or startup error | 1 minute | `break-crash`, `break-oom`, or `break-image` |
+
+`break-network`, `break-service`, and `break-mongodb` demonstrate dependency or
+connectivity failures and are not guaranteed to match these pod-symptom rules.
 
 Inspect, pause, resume, or clean up the profile with:
 
@@ -285,8 +332,7 @@ Inspect, pause, resume, or clean up the profile with:
 Pass `-WorkloadName` when the lab was deployed with a non-default workload name.
 
 `-RunNow` reports exit code `2` when the current SRE Agent API does not expose
-an immediate scheduled-task endpoint. Incident-driven automation still
-requires a portal-created response plan while issue #3 is blocked.
+an immediate scheduled-task endpoint.
 
 ### Grafana Dashboard
 
@@ -300,6 +346,8 @@ Container Insights is verified separately by checking ready `ama-logs` pods,
 the `ContainerInsightsExtension` DCR association, and recent `ContainerLogV2`
 and `KubePodInventory` records. The current profile intentionally uses
 `ContainerLogV2`; an empty legacy `ContainerLog` table is therefore expected.
+On a fresh cluster, initial inventory ingestion can take up to 20 minutes; the
+deployment configures Grafana and SRE Agent before waiting on that final gate.
 
 ### Governance Profile
 
@@ -329,8 +377,9 @@ enforce them.
 | **Outlook** | Connector for email delivery (requires portal authorization) |
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
-
-> **Note:** The configuration script only reads incident-filter state. Creation support is probed separately because the service has not published a stable dataplane request schema.
+| **daily-rbac-cost-network-audit** | Read-only governance audit daily at 08:30 UTC |
+| **hourly-automation-health** | Read-only AKS and Azure Monitor health check every hour |
+| **AKS Pod Failure Handler** | Enabled P1/P2 `Pet Store` response plan routed to incident-handler in Review mode |
 
 ### Post-Configuration: Authorize Outlook
 
@@ -341,31 +390,13 @@ The Outlook connector enables the `SendOutlookEmail` tool so agents can email yo
 3. Sign in with the account that should send incident emails
 4. Once authorized, agents will email findings for incidents and scheduled health checks
 
-### Post-Configuration: Create Incident Response Plan
+### Verify Incident Response
 
-Until the compatibility probe succeeds for the deployed service, treat incident response plan creation as portal-only. Do not put credentials or unreviewed payloads in the repository.
-
-To run the isolated create/read/delete probe, provide a locally reviewed JSON payload:
-
-```powershell
-.\scripts\probe-incident-filter-api.ps1 `
-   -ResourceGroupName "rg-srelab-eastus2" `
-   -PayloadPath .\incident-filter-payload.json
-```
-
-The probe uses a temporary name, prints only status codes and truncated response bodies, and deletes the test filter only after a successful create. Exit code `2` means creation is still unsupported; exit code `1` means the probe itself could not run or cleanup failed.
-
-If the probe reports unsupported creation, create one in the portal:
-
-1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Builder** → **Incident response plans**
-2. Click **New incident response plan**
-3. Configure:
-   - **Name:** AKS Pod Failure Handler
-   - **Severity:** Sev1, Sev2, Sev3
-   - **Title contains:** pod
-   - **Response agent:** incident-handler
-   - **Agent autonomy:** Review
-4. Save — incidents matching the filter will automatically trigger the subagent
+The standard configuration connects Azure Monitor as the incident platform and
+creates `AKS Pod Failure Handler` automatically. In the SRE Agent portal, open
+**Builder** → **Incident response plans** and verify that the plan is **On**, uses
+`incident-handler`, matches P1/P2 alerts containing `Pet Store`, and runs in
+**Review** mode.
 
 ### Partial Re-runs
 

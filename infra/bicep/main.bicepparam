@@ -12,13 +12,13 @@ using 'main.bicep'
 param deployObservability = true
 
 // Baseline alert rules
-param deployAlerts = false
+param deployAlerts = true
 
 // Deploy Azure SRE Agent (programmatic deployment now supported)
 param deploySreAgent = true
 
 // Default action group for incident routing (add webhook at deploy time)
-param deployActionGroup = false
+param deployActionGroup = true
 
 // AKS Configuration - cost-optimized for demo
 param systemNodeVmSize = 'Standard_D2s_v5'

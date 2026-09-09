@@ -74,7 +74,6 @@ alias azsub='az account list -o table'
 
 # Demo shortcuts
 alias deploy='pwsh ./scripts/deploy.ps1'
-alias deploy-monitor='pwsh ./scripts/deploy.ps1 -EnableAzureMonitorAutomation'
 alias destroy='pwsh ./scripts/destroy.ps1'
 
 # Break scenarios
@@ -128,11 +127,6 @@ function deploy {
     & pwsh -File "./scripts/deploy.ps1" -Location $Location @args 
 }
 
-function deploy-monitor {
-    param([string]$Location = "eastus2")
-    & pwsh -File "./scripts/deploy.ps1" -Location $Location -EnableAzureMonitorAutomation @args
-}
-
 function destroy {
     param([string]$ResourceGroupName)
     if ($ResourceGroupName) {
@@ -178,7 +172,6 @@ function menu {
 ║  Commands:                                                                   ║
 ║    az login --use-device-code  - Login to Azure                              ║
 ║    deploy                      - Deploy the infrastructure                   ║
-║    deploy-monitor              - Deploy with Azure Monitor automation       ║
 ║    destroy                     - Tear down the infrastructure                ║
 ║    site                        - Show the store front URL                    ║
 ║    sre-agent                   - Show SRE Agent portal URL                   ║
@@ -212,6 +205,11 @@ function menu {
 
 # Welcome message (calls menu)
 menu
+EOF
+
+# Load the same commands in the PowerShell Extension integrated console.
+cat > ~/.config/powershell/Microsoft.VSCode_profile.ps1 << 'EOF'
+. "$HOME/.config/powershell/Microsoft.PowerShell_profile.ps1"
 EOF
 
 # Create kubectl completion
