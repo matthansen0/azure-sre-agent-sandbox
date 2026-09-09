@@ -18,8 +18,8 @@ param(
     [string]$ResourceGroupName,
 
     [Parameter()]
-    [ValidateRange(1, 10)]
-    [int]$Attempts = 3,
+    [ValidateRange(1, 60)]
+    [int]$Attempts = 40,
 
     [Parameter()]
     [ValidateRange(5, 120)]

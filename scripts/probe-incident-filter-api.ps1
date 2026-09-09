@@ -3,9 +3,10 @@
     Probes SRE Agent incident-filter create/read/delete support.
 
 .DESCRIPTION
-    Runs an isolated, opt-in compatibility probe against the incidentFilters
-    dataplane endpoint. The probe never runs as part of normal deployment.
-    Supply a candidate JSON payload only after reviewing it for secrets.
+    Runs an isolated, opt-in create/read/delete probe against the current
+    incident-playground filter API. The probe never runs as part of normal
+    deployment. Supply a Pascal-case IncidentFilterPayload JSON document only
+    after reviewing it for secrets.
 
 .PARAMETER ResourceGroupName
     Resource group containing the SRE Agent.
@@ -36,7 +37,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$apiPath = "/api/v2/extendedAgent/incidentFilters/$FilterName"
+$apiPath = "/api/v1/incidentplayground/filters/$FilterName"
 
 function Get-AgentEndpoint {
     $raw = az resource list --resource-group $ResourceGroupName --resource-type 'Microsoft.App/agents' --output json 2>$null | Out-String

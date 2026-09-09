@@ -272,6 +272,55 @@ function Write-SubscriptionDeploymentFailureSummary {
     }
 }
 
+function Test-AlertWorkspacePropagationFailure {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName
+    )
+
+    $deployment = Invoke-AzCliJson -Command "az deployment group show --resource-group $ResourceGroupName --name deploy-alerts --output json"
+    if ($deployment.ExitCode -ne 0 -or -not $deployment.Json -or -not $deployment.Json.properties.error) {
+        return $false
+    }
+
+    $errorJson = $deployment.Json.properties.error | ConvertTo-Json -Depth 20
+    return $errorJson -match 'workspace could not be found'
+}
+
+function Wait-LogAnalyticsWorkspaceReady {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$WorkspaceName
+    )
+
+    Write-Host "`n⏳ Azure Monitor has not discovered the new Log Analytics workspace yet." -ForegroundColor Yellow
+    Write-Host "  Waiting for workspace propagation before retrying the deployment..." -ForegroundColor Gray
+
+    $deadline = (Get-Date).AddMinutes(2)
+    do {
+        $state = az monitor log-analytics workspace show `
+            --resource-group $ResourceGroupName `
+            --workspace-name $WorkspaceName `
+            --query provisioningState `
+            --output tsv `
+            --only-show-errors 2>$null
+
+        if ($LASTEXITCODE -eq 0 -and $state -eq 'Succeeded') {
+            Start-Sleep -Seconds 30
+            return $true
+        }
+
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+
+    return $false
+}
+
 function Get-DeletedKeyVaultConflict {
     [CmdletBinding()]
     param(
@@ -590,6 +639,16 @@ try {
         Write-SubscriptionDeploymentFailureSummary -DeploymentName $deploymentName -ResourceGroupName $resourceGroupName
 
         if ($attempt -eq 1) {
+            if (Test-AlertWorkspacePropagationFailure -ResourceGroupName $resourceGroupName) {
+                $workspaceReady = Wait-LogAnalyticsWorkspaceReady `
+                    -ResourceGroupName $resourceGroupName `
+                    -WorkspaceName "log-$WorkloadName"
+                if ($workspaceReady) {
+                    Write-Host "`n🔁 Retrying deployment after Log Analytics workspace propagation..." -ForegroundColor Yellow
+                    continue
+                }
+            }
+
             $deletedKeyVaultConflict = Get-DeletedKeyVaultConflict -ResourceGroupName $resourceGroupName
             if ($deletedKeyVaultConflict) {
                 $resolved = Resolve-DeletedKeyVaultConflict -VaultName $deletedKeyVaultConflict.VaultName -Location $Location
@@ -772,17 +831,6 @@ else {
     throw "Deployment validation script not found at $validateScript"
 }
 
-$telemetryScript = Join-Path $PSScriptRoot "verify-telemetry.ps1"
-if (Test-Path $telemetryScript) {
-    & pwsh -NoLogo -NoProfile -File $telemetryScript -ResourceGroupName $resourceGroupName
-    if ($LASTEXITCODE -ne 0) {
-        throw "Container Insights telemetry verification failed. Review the telemetry output above."
-    }
-}
-else {
-    throw "Telemetry verification script not found at $telemetryScript"
-}
-
 $grafanaScript = Join-Path $PSScriptRoot "configure-grafana.ps1"
 if (Test-Path $grafanaScript) {
     & pwsh -NoLogo -NoProfile -File $grafanaScript -ResourceGroupName $resourceGroupName
@@ -838,6 +886,17 @@ if ($outputs.sreAgentId.value) {
     else {
         Write-Host "  ⚠️  Configuration script not found. Run configure-sre-agent.ps1 manually." -ForegroundColor Yellow
     }
+}
+
+$telemetryScript = Join-Path $PSScriptRoot "verify-telemetry.ps1"
+if (Test-Path $telemetryScript) {
+    & pwsh -NoLogo -NoProfile -File $telemetryScript -ResourceGroupName $resourceGroupName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Container Insights telemetry verification failed. Review the telemetry output above."
+    }
+}
+else {
+    throw "Telemetry verification script not found at $telemetryScript"
 }
 
 # Final instructions

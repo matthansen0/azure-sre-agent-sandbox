@@ -260,8 +260,9 @@ deployment flag or second command is required.
 
 This deploys four symptom-focused alerts and the `ag-srelab` action group. The
 deployment verifier requires those resources on every standard deployment.
-Review-mode remediation and incident response plans remain separate controls;
-incident-filter creation is still subject to the compatibility probe below.
+The deployment also connects Azure Monitor as the incident platform and creates
+an enabled Review-mode response plan that routes matching alerts to
+`incident-handler`.
 
 For the fastest deterministic demo, run `break-crash`. The product service exits
 immediately, and the pod-failure and CrashLoop rules evaluate every minute. Use
@@ -293,8 +294,7 @@ Inspect, pause, resume, or clean up the profile with:
 Pass `-WorkloadName` when the lab was deployed with a non-default workload name.
 
 `-RunNow` reports exit code `2` when the current SRE Agent API does not expose
-an immediate scheduled-task endpoint. Incident-driven automation still
-requires a portal-created response plan while issue #3 is blocked.
+an immediate scheduled-task endpoint.
 
 ### Grafana Dashboard
 
@@ -308,6 +308,8 @@ Container Insights is verified separately by checking ready `ama-logs` pods,
 the `ContainerInsightsExtension` DCR association, and recent `ContainerLogV2`
 and `KubePodInventory` records. The current profile intentionally uses
 `ContainerLogV2`; an empty legacy `ContainerLog` table is therefore expected.
+On a fresh cluster, initial inventory ingestion can take up to 20 minutes; the
+deployment configures Grafana and SRE Agent before waiting on that final gate.
 
 ### Governance Profile
 
@@ -339,8 +341,7 @@ enforce them.
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
 | **daily-rbac-cost-network-audit** | Read-only governance audit daily at 08:30 UTC |
 | **hourly-automation-health** | Read-only AKS and Azure Monitor health check every hour |
-
-> **Note:** The configuration script only reads incident-filter state. Creation support is probed separately because the service has not published a stable dataplane request schema.
+| **AKS Pod Failure Handler** | Enabled P1/P2 `Pet Store` response plan routed to incident-handler in Review mode |
 
 ### Post-Configuration: Authorize Outlook
 
@@ -351,31 +352,13 @@ The Outlook connector enables the `SendOutlookEmail` tool so agents can email yo
 3. Sign in with the account that should send incident emails
 4. Once authorized, agents will email findings for incidents and scheduled health checks
 
-### Post-Configuration: Create Incident Response Plan
+### Verify Incident Response
 
-Until the compatibility probe succeeds for the deployed service, treat incident response plan creation as portal-only. Do not put credentials or unreviewed payloads in the repository.
-
-To run the isolated create/read/delete probe, provide a locally reviewed JSON payload:
-
-```powershell
-.\scripts\probe-incident-filter-api.ps1 `
-   -ResourceGroupName "rg-srelab-eastus2" `
-   -PayloadPath .\incident-filter-payload.json
-```
-
-The probe uses a temporary name, prints only status codes and truncated response bodies, and deletes the test filter only after a successful create. Exit code `2` means creation is still unsupported; exit code `1` means the probe itself could not run or cleanup failed.
-
-If the probe reports unsupported creation, create one in the portal:
-
-1. Open [sre.azure.com](https://sre.azure.com) → your agent → **Builder** → **Incident response plans**
-2. Click **New incident response plan**
-3. Configure:
-   - **Name:** AKS Pod Failure Handler
-   - **Severity:** Sev1, Sev2, Sev3
-   - **Title contains:** pod
-   - **Response agent:** incident-handler
-   - **Agent autonomy:** Review
-4. Save — incidents matching the filter will automatically trigger the subagent
+The standard configuration connects Azure Monitor as the incident platform and
+creates `AKS Pod Failure Handler` automatically. In the SRE Agent portal, open
+**Builder** → **Incident response plans** and verify that the plan is **On**, uses
+`incident-handler`, matches P1/P2 alerts containing `Pet Store`, and runs in
+**Review** mode.
 
 ### Partial Re-runs
 

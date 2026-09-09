@@ -6,10 +6,10 @@
     This script runs after deploy.ps1 to configure the SRE Agent with:
     - Knowledge base documents (runbooks uploaded to Agent Memory)
     - Custom agents via the dataplane v2 API
-    - Azure Monitor connector for incident detection
+    - Azure Monitor connector and incident response plan
     - (Optional) GitHub MCP connector for source code analysis
     - Scheduled health and audit tasks
-    - Portal guidance for incident response plans
+    - Review-mode routing to the incident-handler custom agent
 
     Uses the dataplane v2 API at {agentEndpoint}/api/v2/extendedAgent/
     which is the GA-supported programmatic configuration path.
@@ -216,6 +216,34 @@ function Invoke-DataplaneApi {
     }
 }
 
+function Set-ArmAgentConnector {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][string]$DataConnectorType
+    )
+
+    $url = "https://management.azure.com${agentId}/connectors/${Name}?api-version=2025-05-01-preview"
+    $body = @{
+        properties = @{
+            name              = $Name
+            dataConnectorType = $DataConnectorType
+        }
+    } | ConvertTo-Json -Depth 5 -Compress
+
+    $output = az rest `
+        --method put `
+        --url $url `
+        --body $body `
+        --only-show-errors `
+        --output json 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+
+    return @{
+        ExitCode = $exitCode
+        Body     = $output
+    }
+}
+
 # ============================================================================
 # Step 1: Upload Knowledge Base
 # ============================================================================
@@ -330,7 +358,7 @@ if (-not $SkipAgents) {
     }
     else {
         # Test that pyyaml is available
-        $yamlCheck = & $python -c "import yaml" 2>&1
+        $null = & $python -c "import yaml" 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  📦 Installing pyyaml..." -ForegroundColor Gray
             & $python -m pip install --user pyyaml 2>$null
@@ -442,25 +470,15 @@ if (-not $SkipConnectors) {
     # 3a: Azure Monitor connector (always)
     Write-Host "  📊 Creating Azure Monitor connector..." -ForegroundColor Gray
 
-    $azMonBody = @{
-        name       = "azure-monitor"
-        properties = @{
-            dataConnectorType = "AzureMonitor"
-            dataSource        = "azure-monitor"
-        }
-    } | ConvertTo-Json -Depth 5 -Compress
+    $resp = Set-ArmAgentConnector `
+        -Name 'azure-monitor' `
+        -DataConnectorType 'AzureMonitor'
 
-    $resp = Invoke-DataplaneApi `
-        -Method PUT `
-        -Path "/api/v2/extendedAgent/connectors/azure-monitor" `
-        -Body $azMonBody `
-        -Token $token
-
-    if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 202) {
+    if ($resp.ExitCode -eq 0) {
         Write-Host "    ✅ Azure Monitor connector created" -ForegroundColor Green
     }
     else {
-        Add-ConfigurationFailure -Component 'Connector/azure-monitor' -Reason "HTTP $($resp.StatusCode)"
+        Add-ConfigurationFailure -Component 'Connector/azure-monitor' -Reason "ARM command exit $($resp.ExitCode)"
     }
 
     # 3b: GitHub MCP connector (optional)
@@ -532,26 +550,16 @@ if (-not $SkipConnectors) {
     # 3d: Outlook connector (always — enables SendOutlookEmail tool)
     Write-Host "  📧 Creating Outlook connector..." -ForegroundColor Gray
 
-    $outlookBody = @{
-        name       = "outlook"
-        properties = @{
-            dataConnectorType = "Outlook"
-            dataSource        = "outlook"
-        }
-    } | ConvertTo-Json -Depth 5 -Compress
+    $resp = Set-ArmAgentConnector `
+        -Name 'outlook' `
+        -DataConnectorType 'Outlook'
 
-    $resp = Invoke-DataplaneApi `
-        -Method PUT `
-        -Path "/api/v2/extendedAgent/connectors/outlook" `
-        -Body $outlookBody `
-        -Token $token
-
-    if ($resp.StatusCode -eq 200 -or $resp.StatusCode -eq 202) {
+    if ($resp.ExitCode -eq 0) {
         Write-Host "    ✅ Outlook connector created" -ForegroundColor Green
         Write-Host "    📌 Authorize in portal: https://sre.azure.com → Settings → Connectors → Outlook → Authorize" -ForegroundColor Gray
     }
     else {
-        Add-ConfigurationFailure -Component 'Connector/outlook' -Reason "HTTP $($resp.StatusCode)"
+        Add-ConfigurationFailure -Component 'Connector/outlook' -Reason "ARM command exit $($resp.ExitCode)"
         Write-Host "       Create it in the portal: Settings → Connectors → Add → Outlook" -ForegroundColor Gray
     }
 }
@@ -560,36 +568,142 @@ else {
 }
 
 # ============================================================================
-# Step 4: Probe Incident Filter API (read-only — creation not supported via API)
+# Step 4: Create Incident Response Plan
 # ============================================================================
-Write-Host "`n🚨 Step 4: Checking incident filter status..." -ForegroundColor Yellow
+Write-Host "`n🚨 Step 4: Creating incident response plan..." -ForegroundColor Yellow
 
 $token = Get-SreAgentToken
+$filterName = 'aks-pod-failure-handler'
+$handlerName = "$filterName-handler"
+$filterDefinition = @{
+    Id              = $filterName
+    ImpactedService = 'pets'
+    Priorities      = @('P1', 'P2')
+    TitleContains   = 'Pet Store'
+    AgentMode       = 'review'
+    HandlingAgent   = 'incident-handler'
+}
+$processingGuide = @(
+    'Use the incident-handler workflow to investigate the matched Azure Monitor alert.'
+    'Correlate AKS pod state, Container Insights logs, recent events, and repository runbooks.'
+    'Report root cause and evidence, then propose remediation for approval before any write action.'
+)
+$handlerDefinition = @{
+    id                      = $handlerName
+    name                    = 'AKS Pod Failure Handler'
+    description             = 'Review-mode response plan for high-severity pet store alerts'
+    incidentFilterId        = $filterName
+    incidentProcessingGuide = $processingGuide
+    tools                   = @()
+    incidents               = @()
+    customInstructions      = 'Trigger condition: Pet Store; severity: high; service: pets; mode: review'
+}
+$filterReady = $false
+$filterEnabled = $false
+$handlerReady = $false
 
-# The incidentFilters endpoint supports GET (list) but creation (PUT) is not
-# supported via the dataplane API — incident response plans must be created
-# in the portal. We probe here to show current state.
-$listResp = Invoke-DataplaneApi -Method GET -Path "/api/v2/extendedAgent/incidentFilters" -Token $token
-if ($listResp.StatusCode -eq 200) {
+$filterResponse = Invoke-DataplaneApi `
+    -Method GET `
+    -Path "/api/v1/incidentplayground/filters/$filterName" `
+    -Token $token
+
+if (Test-SuccessStatus -StatusCode $filterResponse.StatusCode) {
     try {
-        $filterList = ($listResp.Body | ConvertFrom-Json).value
-        if ($filterList.Count -gt 0) {
-            Write-Host "  📊 $($filterList.Count) incident filter(s) registered:" -ForegroundColor Green
-            foreach ($filter in $filterList) {
-                Write-Host "     • $($filter.name)" -ForegroundColor Gray
-            }
-        }
-        else {
-            Write-Host "  📊 No incident filters registered yet" -ForegroundColor Gray
-            Write-Host "     Create one in the portal (see guidance below)" -ForegroundColor Gray
-        }
+        $filter = $filterResponse.Body | ConvertFrom-Json
+        $filterReady = $filter.id -eq $filterName -and
+            $filter.impactedService -eq $filterDefinition.ImpactedService -and
+            (@($filter.priorities) -join ',') -eq ($filterDefinition.Priorities -join ',') -and
+            $filter.titleContains -eq $filterDefinition.TitleContains -and
+            $filter.agentMode -eq $filterDefinition.AgentMode -and
+            $filter.handlingAgent -eq $filterDefinition.HandlingAgent -and
+            $filter.isDeleted -ne $true
+        $filterEnabled = $filter.isEnabled -eq $true
     }
     catch {
-        Write-Host "  📊 Could not parse incident filter response" -ForegroundColor Gray
+        $filterReady = $false
+    }
+
+    if (-not $filterReady) {
+        Add-ConfigurationFailure -Component "Incident response filter/$filterName" -Reason 'Existing definition does not match the default plan'
+    }
+}
+elseif ($filterResponse.StatusCode -eq 404) {
+    $filterResponse = Invoke-DataplaneApi `
+        -Method PUT `
+        -Path "/api/v1/incidentplayground/filters/$filterName" `
+        -Body ($filterDefinition | ConvertTo-Json -Depth 10 -Compress) `
+        -Token $token
+
+    if (Test-SuccessStatus -StatusCode $filterResponse.StatusCode) {
+        $filterReady = $true
+    }
+    else {
+        Add-ConfigurationFailure -Component "Incident response filter/$filterName" -Reason "HTTP $($filterResponse.StatusCode)"
     }
 }
 else {
-    Add-ConfigurationFailure -Component 'Incident-filter verification' -Reason "HTTP $($listResp.StatusCode)"
+    Add-ConfigurationFailure -Component "Incident response filter/$filterName" -Reason "HTTP $($filterResponse.StatusCode)"
+}
+
+if ($filterReady) {
+    $handlerResponse = Invoke-DataplaneApi `
+        -Method GET `
+        -Path "/api/v1/incidentplayground/handlers/$handlerName" `
+        -Token $token
+
+    if (Test-SuccessStatus -StatusCode $handlerResponse.StatusCode) {
+        try {
+            $handler = $handlerResponse.Body | ConvertFrom-Json
+            $handlerReady = $handler.id -eq $handlerName -and
+                $handler.name -eq $handlerDefinition.name -and
+                $handler.incidentFilterId -eq $filterName -and
+                (@($handler.incidentProcessingGuide) -join "`n") -eq ($processingGuide -join "`n")
+        }
+        catch {
+            $handlerReady = $false
+        }
+
+        if (-not $handlerReady) {
+            Add-ConfigurationFailure -Component "Incident response handler/$handlerName" -Reason 'Existing definition does not match the default plan'
+        }
+    }
+    elseif ($handlerResponse.StatusCode -eq 404) {
+        $handlerResponse = Invoke-DataplaneApi `
+            -Method PUT `
+            -Path "/api/v1/incidentplayground/handlers/$handlerName" `
+            -Body ($handlerDefinition | ConvertTo-Json -Depth 10 -Compress) `
+            -Token $token
+
+        if (Test-SuccessStatus -StatusCode $handlerResponse.StatusCode) {
+            $handlerReady = $true
+        }
+        else {
+            Add-ConfigurationFailure -Component "Incident response handler/$handlerName" -Reason "HTTP $($handlerResponse.StatusCode)"
+        }
+    }
+    else {
+        Add-ConfigurationFailure -Component "Incident response handler/$handlerName" -Reason "HTTP $($handlerResponse.StatusCode)"
+    }
+}
+
+if ($filterReady -and $handlerReady) {
+    if (-not $filterEnabled) {
+        $enableResponse = Invoke-DataplaneApi `
+            -Method POST `
+            -Path "/api/v1/incidentplayground/filters/$filterName/enable" `
+            -Token $token
+
+        if (-not (Test-SuccessStatus -StatusCode $enableResponse.StatusCode)) {
+            Add-ConfigurationFailure -Component "Incident response plan/$filterName/enable" -Reason "HTTP $($enableResponse.StatusCode)"
+        }
+        else {
+            $filterEnabled = $true
+        }
+    }
+
+    if ($filterEnabled) {
+        Write-Host "  ✅ Incident response plan '$filterName' configured and enabled" -ForegroundColor Green
+    }
 }
 
 # ============================================================================
@@ -663,6 +777,7 @@ Write-Host @"
 $(if ($hasGitHub) { "║  ✅ Custom Agents:  code-analyzer (GitHub enabled)                         ║`n" } else { "" })║  ✅ Connector:      Azure Monitor (incident source)                          ║
 ║  ✅ Connector:      Outlook (email delivery — authorize in portal)           ║
 $(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis)                      ║`n" } else { "" })║  ✅ Scheduled Tasks: daily health, daily audit, hourly health                ║
+║  ✅ Response Plan:  AKS pod failures → incident-handler (Review)             ║
 ║                                                                              ║
 ║  Portal: https://sre.azure.com                                               ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -677,21 +792,6 @@ Write-Host "   1. Open https://sre.azure.com → your agent → Settings → Con
 Write-Host "   2. Find the Outlook connector and click 'Authorize'" -ForegroundColor White
 Write-Host "   3. Sign in with the account that should send incident emails" -ForegroundColor White
 Write-Host "   4. Once authorized, agents can use SendOutlookEmail to deliver results" -ForegroundColor White
-Write-Host ""
-
-# Incident response plan guidance
-Write-Host "📋 Incident Response Plan (portal only — API is read-only):" -ForegroundColor Yellow
-Write-Host "   Incident filters cannot be created via the dataplane API." -ForegroundColor Gray
-Write-Host "   Create one in the portal:" -ForegroundColor Gray
-Write-Host ""
-Write-Host "   1. Open https://sre.azure.com → your agent" -ForegroundColor White
-Write-Host "   2. Go to Builder → Incident response plans" -ForegroundColor White
-Write-Host "   3. Click 'New incident response plan' with these settings:" -ForegroundColor White
-Write-Host "      • Name:            AKS Pod Failure Handler" -ForegroundColor White
-Write-Host "      • Severity:        Sev1, Sev2, Sev3" -ForegroundColor White
-Write-Host "      • Title contains:  pod" -ForegroundColor White
-Write-Host "      • Response agent:  incident-handler" -ForegroundColor White
-Write-Host "      • Agent autonomy:  Review" -ForegroundColor White
 Write-Host ""
 
 Write-Host "Next steps:" -ForegroundColor Yellow

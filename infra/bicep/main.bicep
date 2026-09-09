@@ -261,6 +261,10 @@ module alerts 'modules/alerts.bicep' = if (deployAlerts) {
     appNamespace: 'pets'
     actionGroupIds: effectiveAlertActionGroupIds
   }
+  // Azure Monitor can reject a newly created workspace until it propagates.
+  dependsOn: [
+    aks
+  ]
 }
 
 // =============================================================================

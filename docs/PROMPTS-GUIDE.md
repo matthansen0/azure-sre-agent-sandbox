@@ -183,13 +183,15 @@ After configuration, you can invoke subagents directly:
 
 #### Incident Response Plan
 
-The configuration script also creates a response plan that auto-triggers the `incident-handler` subagent when pod failure alerts fire. This means:
+The configuration script creates the enabled `AKS Pod Failure Handler` response
+plan. It matches P1/P2 Azure Monitor alerts whose title contains `Pet Store`,
+routes them to `incident-handler`, and runs in Review mode. This means:
 
 1. A breakable scenario causes pod crashes
 2. Azure Monitor fires an alert
 3. The SRE Agent picks up the alert
 4. The `incident-handler` subagent runs the relevant runbook automatically
-5. Findings are summarized (and optionally written to a GitHub issue)
+5. Findings and proposed remediation are presented for review before writes
 
 ### Knowledge Base
 

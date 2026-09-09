@@ -68,6 +68,39 @@ if ([string]::IsNullOrWhiteSpace($agentEndpoint)) {
     throw 'SRE Agent endpoint is missing.'
 }
 
+if ($agentDetail.properties.incidentManagementConfiguration.type -eq 'AzMonitor') {
+    Write-Host '  ✅ Azure Monitor incident platform' -ForegroundColor Green
+}
+else {
+    Add-Failure -Component 'Azure Monitor incident platform' -Reason 'Expected incidentManagementConfiguration.type=AzMonitor'
+}
+
+foreach ($connector in @(
+        @{ Name = 'azure-monitor'; Type = 'AzureMonitor' },
+        @{ Name = 'outlook'; Type = 'Outlook' }
+    )) {
+    $connectorUrl = "https://management.azure.com${agentId}/connectors/$($connector.Name)?api-version=2025-05-01-preview"
+    $connectorRaw = az rest --method get --url $connectorUrl --only-show-errors --output json 2>$null | Out-String
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($connectorRaw)) {
+        Add-Failure -Component "Portal connector/$($connector.Name)" -Reason 'ARM connector was not found'
+        continue
+    }
+
+    try {
+        $connectorState = $connectorRaw | ConvertFrom-Json
+        if ($connectorState.properties.dataConnectorType -eq $connector.Type -and
+            $connectorState.properties.provisioningState -eq 'Succeeded') {
+            Write-Host "  ✅ Portal connector/$($connector.Name)" -ForegroundColor Green
+        }
+        else {
+            Add-Failure -Component "Portal connector/$($connector.Name)" -Reason 'Connector type or provisioning state did not match'
+        }
+    }
+    catch {
+        Add-Failure -Component "Portal connector/$($connector.Name)" -Reason 'ARM response was not valid JSON'
+    }
+}
+
 $token = az account get-access-token --resource https://azuresre.dev --query accessToken -o tsv 2>$null
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
     throw 'Could not acquire an SRE Agent dataplane access token.'
@@ -121,7 +154,21 @@ $checks = @(
     @{ Name = 'Outlook connector'; Path = '/api/v2/extendedAgent/connectors/outlook'; Test = { param($data) $null -ne $data } },
     @{ Name = 'Daily health task'; Path = '/api/v2/extendedAgent/scheduledTasks/daily-health-check'; Test = { param($data) $null -ne $data } },
     @{ Name = 'Daily RBAC/cost/network audit task'; Path = '/api/v2/extendedAgent/scheduledTasks/daily-rbac-cost-network-audit'; Test = { param($data) $null -ne $data } },
-    @{ Name = 'Hourly automation health task'; Path = '/api/v2/extendedAgent/scheduledTasks/hourly-automation-health'; Test = { param($data) $null -ne $data } }
+    @{ Name = 'Hourly automation health task'; Path = '/api/v2/extendedAgent/scheduledTasks/hourly-automation-health'; Test = { param($data) $null -ne $data } },
+    @{ Name = 'AKS incident response filter'; Path = '/api/v1/incidentplayground/filters/aks-pod-failure-handler'; Test = {
+            param($data)
+            $data.isEnabled -eq $true -and
+            $data.isDeleted -ne $true -and
+            $data.handlingAgent -eq 'incident-handler' -and
+            $data.agentMode -eq 'review' -and
+            $data.impactedService -eq 'pets' -and
+            $data.titleContains -eq 'Pet Store'
+        } },
+    @{ Name = 'AKS incident response handler'; Path = '/api/v1/incidentplayground/handlers/aks-pod-failure-handler-handler'; Test = {
+            param($data)
+            $data.incidentFilterId -eq 'aks-pod-failure-handler' -and
+            @($data.incidentProcessingGuide).Count -eq 3
+        } }
 )
 
 foreach ($check in $checks) {
@@ -143,14 +190,6 @@ foreach ($check in $checks) {
     catch {
         Add-Failure -Component $check.Name -Reason 'Response was not valid JSON'
     }
-}
-
-$incidentFilters = Invoke-DataplaneApi -Url "$agentEndpoint/api/v2/extendedAgent/incidentFilters" -Token $token
-if ($incidentFilters.StatusCode -eq 200) {
-    Write-Host "  ℹ️  Incident filters readable; creation remains portal-only." -ForegroundColor Gray
-}
-else {
-    Add-Failure -Component 'Incident-filter read-only check' -Reason "HTTP $($incidentFilters.StatusCode)"
 }
 
 if ($failures.Count -gt 0) {

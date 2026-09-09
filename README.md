@@ -78,15 +78,16 @@ After deployment, `deploy.ps1` automatically configures the SRE Agent with:
 
 - **Knowledge base** — Runbooks for each failure category (pod failures, networking, dependencies, resource exhaustion) plus app architecture and incident report templates
 - **Custom agents** — `incident-handler` (alert investigation), `cluster-health-monitor` (proactive checks), and optionally `code-analyzer` (GitHub source code RCA)
-- **Connectors** — Azure Monitor (incident source) and optionally GitHub MCP (source code search)
+- **Connectors** — Azure Monitor and Outlook, plus optional GitHub MCP source-code search
 - **Scheduled tasks** — daily health, daily RBAC/cost/network audit, and hourly automation-health checks
+- **Incident response** — Azure Monitor platform with an enabled Review-mode AKS response plan
 
 ### Getting Started
 
 1. **Open the SRE Agent Portal** — the URL is displayed in deployment output, or visit [sre.azure.com](https://sre.azure.com)
 2. **Verify configuration** — check Builder > Agent Canvas, Knowledge Files
 3. **Break something** — `break-oom`, `break-crash`, etc.
-4. **Ask the agent to investigate** — or create an incident response plan in the portal
+4. **Ask the agent to investigate** — or let the default response plan handle a matching alert
 5. **Ask it to diagnose**:
    - "Why are pods crashing in the pets namespace?"
    - "Run a health check on my cluster"
