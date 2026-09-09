@@ -5,6 +5,9 @@
 .PARAMETER ResourceGroupName
     Resource group containing the lab.
 
+.PARAMETER WorkloadName
+    Workload name used when the lab was deployed.
+
 .PARAMETER Cleanup
     Remove the profile's action group and scheduled-query alerts.
 
@@ -30,6 +33,10 @@ param(
     [string]$ResourceGroupName,
 
     [Parameter()]
+    [ValidateLength(3, 10)]
+    [string]$WorkloadName = 'srelab',
+
+    [Parameter()]
     [switch]$Cleanup,
 
     [Parameter()]
@@ -51,11 +58,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $profileResources = @(
-    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = 'alert-srelab-pod-restarts' },
-    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = 'alert-srelab-http-5xx' },
-    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = 'alert-srelab-pod-failures' },
-    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = 'alert-srelab-crashloop-oom' },
-    @{ Type = 'Microsoft.Insights/actionGroups'; Name = 'ag-srelab' }
+    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = "alert-$WorkloadName-pod-restarts" },
+    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = "alert-$WorkloadName-http-5xx" },
+    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = "alert-$WorkloadName-pod-failures" },
+    @{ Type = 'Microsoft.Insights/scheduledQueryRules'; Name = "alert-$WorkloadName-crashloop-oom" },
+    @{ Type = 'Microsoft.Insights/actionGroups'; Name = "ag-$WorkloadName" }
 )
 
 if ($Cleanup -and -not $ConfirmCleanup) {

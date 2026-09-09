@@ -5,6 +5,9 @@
 .PARAMETER ResourceGroupName
     Name of the resource group containing the SRE Agent.
 
+.PARAMETER WorkloadName
+    Workload name used when the lab was deployed.
+
 .EXAMPLE
     .\verify-sre-agent-configuration.ps1 -ResourceGroupName "rg-srelab-eastus2"
 #>
@@ -13,6 +16,10 @@
 param(
     [Parameter(Mandatory)]
     [string]$ResourceGroupName,
+
+    [Parameter()]
+    [ValidateLength(3, 10)]
+    [string]$WorkloadName = 'srelab',
 
     [Parameter()]
     [switch]$RequireAzureMonitorAutomation,
@@ -72,10 +79,10 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
 if ($RequireAzureMonitorAutomation) {
     $monitorResources = @(az resource list --resource-group $ResourceGroupName --output json 2>$null | ConvertFrom-Json)
     $requiredAlertNames = @(
-        'alert-srelab-pod-restarts',
-        'alert-srelab-http-5xx',
-        'alert-srelab-pod-failures',
-        'alert-srelab-crashloop-oom'
+        "alert-$WorkloadName-pod-restarts",
+        "alert-$WorkloadName-http-5xx",
+        "alert-$WorkloadName-pod-failures",
+        "alert-$WorkloadName-crashloop-oom"
     )
     foreach ($alertName in $requiredAlertNames) {
         if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/scheduledQueryRules' -and $_.name -eq $alertName }).Count -eq 1) {
@@ -86,11 +93,12 @@ if ($RequireAzureMonitorAutomation) {
         }
     }
 
-    if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/actionGroups' -and $_.name -eq 'ag-srelab' }).Count -eq 1) {
-        Write-Host '  ✅ Azure Monitor action group/ag-srelab' -ForegroundColor Green
+    $actionGroupName = "ag-$WorkloadName"
+    if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/actionGroups' -and $_.name -eq $actionGroupName }).Count -eq 1) {
+        Write-Host "  ✅ Azure Monitor action group/$actionGroupName" -ForegroundColor Green
     }
     else {
-        Add-Failure -Component 'Azure Monitor action group/ag-srelab' -Reason 'Expected action group was not found'
+        Add-Failure -Component "Azure Monitor action group/$actionGroupName" -Reason 'Expected action group was not found'
     }
 }
 

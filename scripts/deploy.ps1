@@ -827,7 +827,10 @@ if ($outputs.sreAgentId.value) {
             if (-not (Test-Path $verifyScript)) {
                 throw "SRE Agent verifier not found at $verifyScript"
             }
-            $verifyParams = @{ ResourceGroupName = $resourceGroupName }
+            $verifyParams = @{
+                ResourceGroupName = $resourceGroupName
+                WorkloadName      = $WorkloadName
+            }
             if ($EnableMicrosoftLearnMcp) {
                 $verifyParams.RequireMicrosoftLearnMcp = $true
             }
