@@ -235,7 +235,8 @@ function Invoke-DataplaneApi {
 function Set-ArmAgentConnector {
     param(
         [Parameter(Mandatory)][string]$Name,
-        [Parameter(Mandatory)][string]$DataConnectorType
+        [Parameter(Mandatory)][string]$DataConnectorType,
+        [Parameter(Mandatory)][string]$DataSource
     )
 
     $url = "https://management.azure.com${agentId}/connectors/${Name}?api-version=2025-05-01-preview"
@@ -243,6 +244,7 @@ function Set-ArmAgentConnector {
         properties = @{
             name              = $Name
             dataConnectorType = $DataConnectorType
+            dataSource        = $DataSource
         }
     } | ConvertTo-Json -Depth 5 -Compress
 
@@ -505,7 +507,8 @@ if (-not $SkipConnectors) {
 
     $resp = Set-ArmAgentConnector `
         -Name 'azure-monitor' `
-        -DataConnectorType 'AzureMonitor'
+        -DataConnectorType 'AzureMonitor' `
+        -DataSource 'azure-monitor'
 
     if ($resp.ExitCode -eq 0) {
         Write-Host "    ✅ Azure Monitor connector created" -ForegroundColor Green
@@ -585,7 +588,8 @@ if (-not $SkipConnectors) {
 
     $resp = Set-ArmAgentConnector `
         -Name 'outlook' `
-        -DataConnectorType 'Outlook'
+        -DataConnectorType 'Outlook' `
+        -DataSource 'outlook'
 
     if ($resp.ExitCode -eq 0) {
         Write-Host "    ✅ Outlook connector created" -ForegroundColor Green
