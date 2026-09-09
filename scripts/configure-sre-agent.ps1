@@ -23,6 +23,12 @@
 .PARAMETER GitHubRepo
     Optional GitHub repository (owner/repo format) for code analysis agent.
 
+.PARAMETER EnableMicrosoftLearnMcp
+    Create the optional credential-free Microsoft Learn MCP connector.
+
+.PARAMETER RemoveMicrosoftLearnMcp
+    Remove the Microsoft Learn MCP connector and exit without changing other configuration.
+
 .PARAMETER SkipKnowledgeBase
     Skip knowledge base upload.
 
@@ -69,12 +75,19 @@ param(
     [switch]$EnableMicrosoftLearnMcp,
 
     [Parameter()]
+    [switch]$RemoveMicrosoftLearnMcp,
+
+    [Parameter()]
     [switch]$SkipScheduledTasks
 )
 
 $ErrorActionPreference = 'Stop'
 $configurationFailures = [System.Collections.Generic.List[string]]::new()
 $githubPreflightPassed = $false
+
+if ($EnableMicrosoftLearnMcp -and $RemoveMicrosoftLearnMcp) {
+    throw 'EnableMicrosoftLearnMcp and RemoveMicrosoftLearnMcp cannot be used together.'
+}
 
 function Add-ConfigurationFailure {
     param([Parameter(Mandatory)][string]$Component, [Parameter(Mandatory)][string]$Reason)
@@ -194,10 +207,13 @@ function Invoke-DataplaneApi {
                       '-H', "Authorization: Bearer $Token")
 
         if ($Body) {
-            $curlArgs += @('-H', 'Content-Type: application/json', '-d', $Body)
+            $curlArgs += @('-H', 'Content-Type: application/json', '--data-binary', '@-')
+            $output = $Body | & curl @curlArgs 2>&1
+        }
+        else {
+            $output = & curl @curlArgs 2>&1
         }
 
-        $output = & curl @curlArgs 2>&1
         $lines = ($output -join "`n") -split "`n"
         $httpCode = $lines[-1].Trim()
         $responseBody = if ($lines.Count -gt 1) { ($lines[0..($lines.Count - 2)]) -join "`n" } else { '' }
@@ -242,6 +258,23 @@ function Set-ArmAgentConnector {
         ExitCode = $exitCode
         Body     = $output
     }
+}
+
+if ($RemoveMicrosoftLearnMcp) {
+    Write-Host "`n📚 Removing Microsoft Learn MCP connector..." -ForegroundColor Yellow
+    $token = Get-SreAgentToken
+    $response = Invoke-DataplaneApi `
+        -Method DELETE `
+        -Path '/api/v2/extendedAgent/connectors/microsoft-learn' `
+        -Token $token
+
+    if ((Test-SuccessStatus -StatusCode $response.StatusCode) -or $response.StatusCode -eq 404) {
+        Write-Host '  ✅ Microsoft Learn MCP connector is absent.' -ForegroundColor Green
+        exit 0
+    }
+
+    Write-Error "Could not remove Microsoft Learn MCP connector. HTTP $($response.StatusCode)"
+    exit 1
 }
 
 # ============================================================================

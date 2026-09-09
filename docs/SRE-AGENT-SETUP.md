@@ -239,10 +239,23 @@ The `deploy.ps1` script automatically calls `configure-sre-agent.ps1` after a su
 When GitHub is enabled, the script preflights repository and branch access,
 restricts agent instructions to that scope, redacts credentials from evidence,
 requires review before issue creation, and prohibits pull-request writes. The
-default deployment remains GitHub-free.
+default deployment remains GitHub-free. This repository supplies infrastructure,
+Kubernetes, automation, and runbook context. Connect the upstream
+`Azure-Samples/aks-store-demo` repository or your fork when application
+service-code RCA is required; the service source is not vendored here.
 
-Microsoft Learn MCP is an independent opt-in track and requires no customer
-credentials:
+### Microsoft Learn MCP (Optional)
+
+Microsoft Learn MCP is an independent, credential-free track. Enable it during
+the standard deployment:
+
+```powershell
+.\scripts\deploy.ps1 `
+   -Location eastus2 `
+   -EnableMicrosoftLearnMcp
+```
+
+Or add it to an existing agent:
 
 ```powershell
 .\scripts\configure-sre-agent.ps1 `
@@ -250,8 +263,33 @@ credentials:
    -EnableMicrosoftLearnMcp
 ```
 
-The connector uses `https://learn.microsoft.com/api/mcp`. Its setup failure is
-reported when enabled, but it never blocks the core configuration when omitted.
+Verify the optional track independently:
+
+```powershell
+.\scripts\verify-sre-agent-configuration.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -RequireMicrosoftLearnMcp
+```
+
+Then ask: "Using Microsoft Learn, find the current Azure SRE Agent supported
+regions and cite the documentation you used." A successful response includes a
+Microsoft Learn connector tool call and source links.
+
+The connector uses `https://learn.microsoft.com/api/mcp`, requires outbound
+HTTPS on port 443 to `learn.microsoft.com`, and requires no inbound access or
+customer credentials. Its setup failure is reported when enabled, but it never
+blocks the core configuration when omitted. Remove it independently with:
+
+```powershell
+.\scripts\configure-sre-agent.ps1 `
+   -ResourceGroupName "rg-srelab-eastus2" `
+   -RemoveMicrosoftLearnMcp
+```
+
+The removal is idempotent and exits without changing knowledge, agents, other
+connectors, response plans, or scheduled tasks. You can also delete it from
+**Builder** > **Connectors**. Omitting `-EnableMicrosoftLearnMcp` prevents
+creation but does not delete a connector that was enabled previously.
 
 ### Azure Monitor Automation Profile
 

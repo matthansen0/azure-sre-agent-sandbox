@@ -105,6 +105,12 @@ To enable source code analysis and automated issue creation:
     -GitHubBranch "main"
 ```
 
+This repository provides infrastructure, Kubernetes manifests, automation, and
+runbook context. For application service-code RCA, connect the upstream
+`Azure-Samples/aks-store-demo` repository or your fork; that source code is not
+vendored here. GitHub issue creation remains reviewable and scoped to the
+selected repository and branch, and pull-request writes are prohibited.
+
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions, or [docs/PROMPTS-GUIDE.md](docs/PROMPTS-GUIDE.md) for a full catalog of prompts to try.
 
 ## 💰 Cost Estimate
@@ -159,7 +165,7 @@ deployment is considered ready.
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
 | `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario oom-killed` | Run, restore, and report one scenario lifecycle |
 | `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario crash-loop` | Run, restore, and report another scenario lifecycle |
-| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario image-pull` | Run, restore, and report yet another scenario lifecycle |
+| `.\scripts\run-demo-scenario.ps1 -ResourceGroupName <rg> -Scenario image-pull-backoff` | Run, restore, and report yet another scenario lifecycle |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
 **Deploy script parameters:**

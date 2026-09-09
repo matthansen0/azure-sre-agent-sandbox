@@ -216,6 +216,12 @@ When you provide a GitHub PAT, the configuration script enables:
 - **Full incident-handler** — upgraded to create GitHub issues with structured reports
 - **code-analyzer subagent** — deep source code root cause analysis
 
+This repository contains the lab infrastructure, Kubernetes manifests, scripts,
+and runbooks. Connect `Azure-Samples/aks-store-demo` or your fork when the demo
+needs application service-code RCA; the service source is not included here.
+Issue creation requires review and stays within the configured repository and
+branch. Pull-request writes are prohibited.
+
 To add GitHub integration after initial setup:
 ```powershell
 .\scripts\configure-sre-agent.ps1 `
@@ -223,6 +229,22 @@ To add GitHub integration after initial setup:
     -GitHubPat $env:GITHUB_PAT `
     -GitHubRepo "owner/repo"
 ```
+
+### Microsoft Learn MCP Integration (Optional)
+
+Enable the credential-free Microsoft Learn connector with
+`-EnableMicrosoftLearnMcp`, then verify it with:
+
+```powershell
+.\scripts\verify-sre-agent-configuration.ps1 `
+    -ResourceGroupName "rg-srelab-eastus2" `
+    -RequireMicrosoftLearnMcp
+```
+
+Use this repeatable demonstration prompt:
+
+> Using Microsoft Learn, find the current Azure SRE Agent supported regions and
+> cite the documentation you used.
 
 ---
 

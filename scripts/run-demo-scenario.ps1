@@ -47,6 +47,7 @@ $scenarioPath = Join-Path $PSScriptRoot "..\k8s\scenarios\$Scenario.yaml"
 $baselinePath = Join-Path $PSScriptRoot '..\k8s\base\application.yaml'
 $validatePath = Join-Path $PSScriptRoot 'validate-deployment.ps1'
 $events = [System.Collections.Generic.List[object]]::new()
+$restoreRequired = $false
 
 function Add-Stage {
     param([string]$Name, [string]$Status, [string]$Detail = '')
@@ -120,6 +121,7 @@ try {
     Add-Stage -Name 'baseline' -Status 'passed'
 
     Add-Stage -Name 'fault-injection' -Status 'running'
+    $restoreRequired = $true
     kubectl apply -f $scenarioPath | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Scenario manifest could not be applied.' }
     Add-Stage -Name 'fault-injection' -Status 'passed'
@@ -136,30 +138,44 @@ try {
     Add-Stage -Name 'alert' -Status 'not-observed' -Detail 'External Azure Monitor/SRE Agent trigger evidence was not supplied.'
     Add-Stage -Name 'investigation' -Status 'not-observed' -Detail 'Run the SRE Agent prompt separately and attach evidence if available.'
     Add-Stage -Name 'approval' -Status 'not-observed' -Detail 'No remediation approval event was supplied.'
-
-    Add-Stage -Name 'restore' -Status 'running'
-    kubectl apply -f $baselinePath | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Baseline manifest could not be reapplied.' }
-    Add-Stage -Name 'restore' -Status 'passed'
-
-    Add-Stage -Name 'recovery' -Status 'running'
-    $deploymentNamesRaw = & kubectl get deployment -n pets -o jsonpath='{.items[*].metadata.name}' 2>&1
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($deploymentNamesRaw)) {
-        throw 'Could not enumerate deployments while waiting for recovery.'
-    }
-    foreach ($deploymentName in ($deploymentNamesRaw -split '\s+' | Where-Object { $_ })) {
-        kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Deployment $deploymentName did not recover before timeout." }
-    }
-    $validationOutput = & pwsh -NoLogo -NoProfile -File $validatePath -ResourceGroupName $ResourceGroupName 2>&1 | Out-String
-    $validationExitCode = $LASTEXITCODE
-    $report.restored = Get-Evidence
-    if ($validationExitCode -ne 0) { throw "Final validation failed with exit code $validationExitCode." }
-    Add-Stage -Name 'recovery' -Status 'passed'
-    Add-Stage -Name 'report' -Status 'passed'
 }
 catch {
     Add-Stage -Name 'workflow' -Status 'failed' -Detail $_.Exception.Message
+}
+finally {
+    if ($restoreRequired) {
+        $activeCleanupStage = $null
+        try {
+            $activeCleanupStage = 'restore'
+            Add-Stage -Name 'restore' -Status 'running'
+            kubectl apply -f $baselinePath | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Baseline manifest could not be reapplied.' }
+            Add-Stage -Name 'restore' -Status 'passed'
+
+            $activeCleanupStage = 'recovery'
+            Add-Stage -Name 'recovery' -Status 'running'
+            $deploymentNamesRaw = & kubectl get deployment -n pets -o jsonpath='{.items[*].metadata.name}' 2>&1
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($deploymentNamesRaw)) {
+                throw 'Could not enumerate deployments while waiting for recovery.'
+            }
+            foreach ($deploymentName in ($deploymentNamesRaw -split '\s+' | Where-Object { $_ })) {
+                kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw "Deployment $deploymentName did not recover before timeout." }
+            }
+            $validationOutput = & pwsh -NoLogo -NoProfile -File $validatePath -ResourceGroupName $ResourceGroupName 2>&1 | Out-String
+            $validationExitCode = $LASTEXITCODE
+            $report.restored = Get-Evidence
+            if ($validationExitCode -ne 0) { throw "Final validation failed with exit code $validationExitCode." }
+            Add-Stage -Name 'recovery' -Status 'passed'
+            $activeCleanupStage = $null
+        }
+        catch {
+            if ($activeCleanupStage) {
+                Add-Stage -Name $activeCleanupStage -Status 'failed' -Detail $_.Exception.Message
+            }
+            Add-Stage -Name 'cleanup' -Status 'failed' -Detail $_.Exception.Message
+        }
+    }
 }
 
 $report.stages = @($events)
