@@ -814,6 +814,9 @@ if ($outputs.sreAgentId.value) {
             if ($EnableMicrosoftLearnMcp) {
                 $configureParams.EnableMicrosoftLearnMcp = $true
             }
+            if ($EnableAzureMonitorAutomation) {
+                $configureParams.EnableAzureMonitorAutomation = $true
+            }
             & $configureScript @configureParams
             if ($LASTEXITCODE -ne 0) {
                 throw "SRE Agent configuration returned exit code $LASTEXITCODE"
@@ -824,12 +827,15 @@ if ($outputs.sreAgentId.value) {
             if (-not (Test-Path $verifyScript)) {
                 throw "SRE Agent verifier not found at $verifyScript"
             }
-            $verifyParams = @{ ResourceGroupName = $resourceGroupName }
-            if ($EnableAzureMonitorAutomation) {
-                $verifyParams.RequireAzureMonitorAutomation = $true
+            $verifyParams = @{
+                ResourceGroupName = $resourceGroupName
+                WorkloadName      = $WorkloadName
             }
             if ($EnableMicrosoftLearnMcp) {
                 $verifyParams.RequireMicrosoftLearnMcp = $true
+            }
+            if ($EnableAzureMonitorAutomation) {
+                $verifyParams.RequireAzureMonitorAutomation = $true
             }
             & $verifyScript @verifyParams
             if ($LASTEXITCODE -ne 0) {

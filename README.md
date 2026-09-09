@@ -40,6 +40,12 @@ To opt into the Azure Monitor automation profile, add
 `-EnableAzureMonitorAutomation`. The core deployment leaves alert rules and the
 default action group disabled.
 
+```powershell
+.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
+```
+
+In the dev container, `deploy-monitor -Yes` runs the same opt-in deployment.
+
 Inspect or explicitly remove the enabled profile with:
 
 ```powershell
@@ -153,6 +159,7 @@ deployment is considered ready.
 | Command | Description |
 |---------|-------------|
 | `.\scripts\deploy.ps1 -Location eastus2` | Deploy all infrastructure to Azure |
+| `deploy-monitor -Yes` | Deploy with the optional Azure Monitor automation profile in the dev container |
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
 | `.\scripts\configure-sre-agent.ps1 -ResourceGroupName <rg>` | Configure SRE Agent (KB, agents, connectors) |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |

@@ -31,7 +31,7 @@ var alertActions = {
   }
 }
 
-resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
+resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-preview' = {
   name: '${namePrefix}-pod-restarts'
   location: location
   tags: tags
@@ -66,7 +66,7 @@ resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   }
 }
 
-resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
+resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-preview' = {
   name: '${namePrefix}-http-5xx'
   location: location
   tags: tags
@@ -101,7 +101,7 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   }
 }
 
-resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
+resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-preview' = {
   name: '${namePrefix}-pod-failures'
   location: location
   tags: tags
@@ -136,7 +136,7 @@ resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   }
 }
 
-resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
+resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2025-01-01-preview' = {
   name: '${namePrefix}-crashloop-oom'
   location: location
   tags: tags
