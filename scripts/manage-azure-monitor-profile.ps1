@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Reports or removes the opt-in Azure Monitor automation profile.
+    Reports or manages the Azure Monitor automation profile.
 
 .PARAMETER ResourceGroupName
     Resource group containing the lab.

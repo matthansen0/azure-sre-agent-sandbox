@@ -189,7 +189,8 @@ Once connected, you can interact with SRE Agent using natural language:
 
 ### Scheduled Tasks
 
-Create automated diagnosis tasks:
+The standard deployment creates daily health, daily RBAC/cost/network audit, and
+hourly automation-health tasks. To create additional diagnosis tasks:
 
 1. Go to **Subagent builder** in SRE Agent
 2. Click **Create scheduled task**
@@ -252,23 +253,13 @@ credentials:
 The connector uses `https://learn.microsoft.com/api/mcp`. Its setup failure is
 reported when enabled, but it never blocks the core configuration when omitted.
 
-### Optional Azure Monitor Automation Profile
+### Azure Monitor Automation Profile
 
-The core deployment does not create alert rules or an action group. Enable the
-profile explicitly when testing alert-driven workflows:
-
-```powershell
-.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
-```
-
-In the dev container, use the equivalent menu command:
-
-```powershell
-deploy-monitor -Yes
-```
+The standard deployment creates the Azure Monitor automation profile; no extra
+deployment flag or second command is required.
 
 This deploys four symptom-focused alerts and the `ag-srelab` action group. The
-deployment verifier requires those resources only when the profile is enabled.
+deployment verifier requires those resources on every standard deployment.
 Review-mode remediation and incident response plans remain separate controls;
 incident-filter creation is still subject to the compatibility probe below.
 
@@ -346,6 +337,8 @@ enforce them.
 | **Outlook** | Connector for email delivery (requires portal authorization) |
 | **GitHub MCP** | (Optional) Connector for searching code and creating issues |
 | **daily-health-check** | Scheduled task that runs cluster-health-monitor daily at 08:00 UTC |
+| **daily-rbac-cost-network-audit** | Read-only governance audit daily at 08:30 UTC |
+| **hourly-automation-health** | Read-only AKS and Azure Monitor health check every hour |
 
 > **Note:** The configuration script only reads incident-filter state. Creation support is probed separately because the service has not published a stable dataplane request schema.
 

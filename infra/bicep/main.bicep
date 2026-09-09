@@ -29,13 +29,13 @@ param location string = 'eastus2'
 param deployObservability bool = true
 
 @description('Deploy baseline Azure Monitor alert rules for AKS and app telemetry')
-param deployAlerts bool = false
+param deployAlerts bool = true
 
 @description('Deploy Azure SRE Agent for AI-powered diagnostics and remediation')
 param deploySreAgent bool = true
 
 @description('Deploy default Action Group for alert notifications and incident routing')
-param deployActionGroup bool = false
+param deployActionGroup bool = true
 
 @description('Action Group short name (max 12 characters)')
 @maxLength(12)

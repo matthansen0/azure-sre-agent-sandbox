@@ -8,7 +8,7 @@
     - Custom agents via the dataplane v2 API
     - Azure Monitor connector for incident detection
     - (Optional) GitHub MCP connector for source code analysis
-    - Scheduled health check task
+    - Scheduled health and audit tasks
     - Portal guidance for incident response plans
 
     Uses the dataplane v2 API at {agentEndpoint}/api/v2/extendedAgent/
@@ -67,9 +67,6 @@ param(
 
     [Parameter()]
     [switch]$EnableMicrosoftLearnMcp,
-
-    [Parameter()]
-    [switch]$EnableAzureMonitorAutomation,
 
     [Parameter()]
     [switch]$SkipScheduledTasks
@@ -609,21 +606,17 @@ if (-not $SkipScheduledTasks) {
             Cron = '0 8 * * *'
             Prompt = 'Run a comprehensive health check of the AKS cluster in the pets namespace. Check all pod statuses, recent restarts, resource utilization, and error trends. Report any issues found with severity ratings.'
         }
+        @{
+            Name = 'daily-rbac-cost-network-audit'
+            Cron = '30 8 * * *'
+            Prompt = 'Run a read-only audit of the pets demo resource group. Review RBAC scope, estimated cost signals, network configuration, and public exposure. Report findings without making changes.'
+        }
+        @{
+            Name = 'hourly-automation-health'
+            Cron = '0 * * * *'
+            Prompt = 'Run a read-only health check of the pets namespace and Azure Monitor integration. Report active failures, alert readiness, and telemetry gaps. Do not remediate.'
+        }
     )
-    if ($EnableAzureMonitorAutomation) {
-        $scheduledTasks += @(
-            @{
-                Name = 'daily-rbac-cost-network-audit'
-                Cron = '30 8 * * *'
-                Prompt = 'Run a read-only audit of the pets demo resource group. Review RBAC scope, estimated cost signals, network configuration, and public exposure. Report findings without making changes.'
-            }
-            @{
-                Name = 'hourly-automation-health'
-                Cron = '0 * * * *'
-                Prompt = 'Run a read-only health check of the pets namespace and Azure Monitor integration. Report active failures, alert readiness, and telemetry gaps. Do not remediate.'
-            }
-        )
-    }
 
     foreach ($task in $scheduledTasks) {
         $taskBody = @{
@@ -669,7 +662,7 @@ Write-Host @"
 ║  ✅ Custom Agents:  incident-handler, cluster-health-monitor                 ║
 $(if ($hasGitHub) { "║  ✅ Custom Agents:  code-analyzer (GitHub enabled)                         ║`n" } else { "" })║  ✅ Connector:      Azure Monitor (incident source)                          ║
 ║  ✅ Connector:      Outlook (email delivery — authorize in portal)           ║
-$(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis)                      ║`n" } else { "" })║  ✅ Scheduled Task: daily-health-check (08:00 UTC)                           ║
+$(if ($hasGitHub) { "║  ✅ Connector:      GitHub MCP (source code analysis)                      ║`n" } else { "" })║  ✅ Scheduled Tasks: daily health, daily audit, hourly health                ║
 ║                                                                              ║
 ║  Portal: https://sre.azure.com                                               ║
 ╚══════════════════════════════════════════════════════════════════════════════╝

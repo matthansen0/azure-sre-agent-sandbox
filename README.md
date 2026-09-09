@@ -36,17 +36,11 @@ az login --use-device-code
 .\scripts\deploy.ps1 -Location eastus2 -Yes
 ```
 
-To opt into the Azure Monitor automation profile, add
-`-EnableAzureMonitorAutomation`. The core deployment leaves alert rules and the
-default action group disabled.
+The standard deployment includes the Azure Monitor automation profile: four
+one-minute log alerts, the default action group, and scheduled SRE Agent health
+and audit tasks.
 
-```powershell
-.\scripts\deploy.ps1 -Location eastus2 -Yes -EnableAzureMonitorAutomation
-```
-
-In the dev container, `deploy-monitor -Yes` runs the same opt-in deployment.
-
-Inspect or explicitly remove the enabled profile with:
+Inspect or explicitly remove the default profile with:
 
 ```powershell
 .\scripts\manage-azure-monitor-profile.ps1 -ResourceGroupName "rg-srelab-eastus2"
@@ -85,7 +79,7 @@ After deployment, `deploy.ps1` automatically configures the SRE Agent with:
 - **Knowledge base** — Runbooks for each failure category (pod failures, networking, dependencies, resource exhaustion) plus app architecture and incident report templates
 - **Custom agents** — `incident-handler` (alert investigation), `cluster-health-monitor` (proactive checks), and optionally `code-analyzer` (GitHub source code RCA)
 - **Connectors** — Azure Monitor (incident source) and optionally GitHub MCP (source code search)
-- **Scheduled tasks** — `daily-health-check` runs cluster-health-monitor every day at 08:00 UTC
+- **Scheduled tasks** — daily health, daily RBAC/cost/network audit, and hourly automation-health checks
 
 ### Getting Started
 
@@ -159,7 +153,6 @@ deployment is considered ready.
 | Command | Description |
 |---------|-------------|
 | `.\scripts\deploy.ps1 -Location eastus2` | Deploy all infrastructure to Azure |
-| `deploy-monitor -Yes` | Deploy with the optional Azure Monitor automation profile in the dev container |
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
 | `.\scripts\configure-sre-agent.ps1 -ResourceGroupName <rg>` | Configure SRE Agent (KB, agents, connectors) |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
@@ -172,7 +165,6 @@ deployment is considered ready.
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
-- `-EnableAzureMonitorAutomation`: Deploy Azure Monitor alerts and the default action group (disabled by default)
 - `-EnableMicrosoftLearnMcp`: Enable the credential-free Microsoft Learn MCP connector (disabled by default)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)

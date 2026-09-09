@@ -22,9 +22,6 @@ param(
     [string]$WorkloadName = 'srelab',
 
     [Parameter()]
-    [switch]$RequireAzureMonitorAutomation,
-
-    [Parameter()]
     [switch]$RequireMicrosoftLearnMcp
 )
 
@@ -76,32 +73,29 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
     throw 'Could not acquire an SRE Agent dataplane access token.'
 }
 
-if ($RequireAzureMonitorAutomation) {
-    $monitorResources = @(az resource list --resource-group $ResourceGroupName --output json 2>$null | ConvertFrom-Json)
-    $requiredAlertNames = @(
-        "alert-$WorkloadName-pod-restarts",
-        "alert-$WorkloadName-http-5xx",
-        "alert-$WorkloadName-pod-failures",
-        "alert-$WorkloadName-crashloop-oom"
-    )
-    foreach ($alertName in $requiredAlertNames) {
-        if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/scheduledQueryRules' -and $_.name -eq $alertName }).Count -eq 1) {
-            Write-Host "  ✅ Azure Monitor alert/$alertName" -ForegroundColor Green
-        }
-        else {
-            Add-Failure -Component "Azure Monitor alert/$alertName" -Reason 'Expected alert resource was not found'
-        }
-    }
-
-    $actionGroupName = "ag-$WorkloadName"
-    if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/actionGroups' -and $_.name -eq $actionGroupName }).Count -eq 1) {
-        Write-Host "  ✅ Azure Monitor action group/$actionGroupName" -ForegroundColor Green
+$monitorResources = @(az resource list --resource-group $ResourceGroupName --output json 2>$null | ConvertFrom-Json)
+$requiredAlertNames = @(
+    "alert-$WorkloadName-pod-restarts",
+    "alert-$WorkloadName-http-5xx",
+    "alert-$WorkloadName-pod-failures",
+    "alert-$WorkloadName-crashloop-oom"
+)
+foreach ($alertName in $requiredAlertNames) {
+    if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/scheduledQueryRules' -and $_.name -eq $alertName }).Count -eq 1) {
+        Write-Host "  ✅ Azure Monitor alert/$alertName" -ForegroundColor Green
     }
     else {
-        Add-Failure -Component "Azure Monitor action group/$actionGroupName" -Reason 'Expected action group was not found'
+        Add-Failure -Component "Azure Monitor alert/$alertName" -Reason 'Expected alert resource was not found'
     }
 }
 
+$actionGroupName = "ag-$WorkloadName"
+if (@($monitorResources | Where-Object { $_.type -eq 'Microsoft.Insights/actionGroups' -and $_.name -eq $actionGroupName }).Count -eq 1) {
+    Write-Host "  ✅ Azure Monitor action group/$actionGroupName" -ForegroundColor Green
+}
+else {
+    Add-Failure -Component "Azure Monitor action group/$actionGroupName" -Reason 'Expected action group resource was not found'
+}
 if ($RequireMicrosoftLearnMcp) {
     $learnResponse = Invoke-DataplaneApi -Url "$agentEndpoint/api/v2/extendedAgent/connectors/microsoft-learn" -Token $token
     if ($learnResponse.StatusCode -eq 200) {
@@ -115,21 +109,6 @@ else {
     Write-Host '  ℹ️  Microsoft Learn MCP connector skipped (opt-in).' -ForegroundColor Gray
 }
 
-if ($RequireAzureMonitorAutomation) {
-    foreach ($taskName in @('daily-rbac-cost-network-audit', 'hourly-automation-health')) {
-        $taskResponse = Invoke-DataplaneApi -Url "$agentEndpoint/api/v2/extendedAgent/scheduledTasks/$taskName" -Token $token
-        if ($taskResponse.StatusCode -eq 200) {
-            Write-Host "  ✅ Azure Monitor automation task/$taskName" -ForegroundColor Green
-        }
-        else {
-            Add-Failure -Component "Azure Monitor automation task/$taskName" -Reason "HTTP $($taskResponse.StatusCode)"
-        }
-    }
-}
-else {
-    Write-Host '  ℹ️  Azure Monitor automation tasks skipped (opt-in).' -ForegroundColor Gray
-}
-
 $checks = @(
     @{ Name = 'Knowledge base'; Path = '/api/v1/AgentMemory/files'; Test = { param($data) @($data.files | Where-Object { $_.isIndexed }).Count -gt 0 } },
     @{ Name = 'Custom agents'; Path = '/api/v2/extendedAgent/agents'; Test = {
@@ -140,7 +119,9 @@ $checks = @(
         } },
     @{ Name = 'Azure Monitor connector'; Path = '/api/v2/extendedAgent/connectors/azure-monitor'; Test = { param($data) $null -ne $data } },
     @{ Name = 'Outlook connector'; Path = '/api/v2/extendedAgent/connectors/outlook'; Test = { param($data) $null -ne $data } },
-    @{ Name = 'Daily health task'; Path = '/api/v2/extendedAgent/scheduledTasks/daily-health-check'; Test = { param($data) $null -ne $data } }
+    @{ Name = 'Daily health task'; Path = '/api/v2/extendedAgent/scheduledTasks/daily-health-check'; Test = { param($data) $null -ne $data } },
+    @{ Name = 'Daily RBAC/cost/network audit task'; Path = '/api/v2/extendedAgent/scheduledTasks/daily-rbac-cost-network-audit'; Test = { param($data) $null -ne $data } },
+    @{ Name = 'Hourly automation health task'; Path = '/api/v2/extendedAgent/scheduledTasks/hourly-automation-health'; Test = { param($data) $null -ne $data } }
 )
 
 foreach ($check in $checks) {
